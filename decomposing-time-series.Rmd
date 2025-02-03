@@ -1,0 +1,17 @@
+---
+title: "decomposing-time-series"
+output: html_document
+author: @Jernerwal_Jeremy
+---
+
+```{r}
+library(tidyverse)
+library(TSstudio)
+library(plotly)
+library(xts)
+```
+
+```{r}
+
+```
+
