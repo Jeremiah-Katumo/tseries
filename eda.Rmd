@@ -2,6 +2,9 @@
 title: "Exploratory Data Analysis for Time Series Objects"
 output: html_document
 title: @Jernerwal_Jeremy
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r}
@@ -11,6 +14,7 @@ library(xts)
 library(zoo)
 library(TSstudio)
 ```
+
 ```{r}
 data(EURO_Brent)
 data("Michigan_CS")
@@ -41,6 +45,7 @@ end(EURO_Brent)
 ```{r}
 head(time(EURO_Brent), 12)
 ```
+
 # Merging Time Series Objects
 
 ```{r}
@@ -55,7 +60,7 @@ ts_info(Michigan_CS)
 ts_info(EURO_Brent)
 ```
 
-# Therefore, in this case, the merge process is straightforward. 
+Therefore, in this case, the merge process is straightforward.
 
 ```{r}
 xts_merge_outer <- merge.xts(Michigan_CS = Michigan_CS, EURO_Brent = EURO_Brent, join = "outer")
@@ -105,14 +110,17 @@ plot.zoo(
   col = "blue"
 )
 ```
+
 ```{r}
 data("US_indicators")
 
 head(US_indicators)
 ```
+
 ```{r}
 names(US_indicators)
 ```
+
 ```{r}
 US_indicators_zoo <- zoo(
   x = US_indicators[,c("Vehicle Sales", "Unemployment Rate")],
@@ -139,6 +147,7 @@ plot.xts(
   minor.ticks = "years"
 )
 ```
+
 ```{r}
 US_indicators_xts <- xts(
   x = US_indicators[,c("Vehicle Sales", "Unemployment Rate")],
@@ -165,8 +174,7 @@ USgas_xts <- as.xts(USgas)
 indexClass(USgas_xts)
 ```
 
-Last but not least, we will calculate the monthly percentage difference and the year-over-
-year growth by utilizing the lag function
+Last but not least, we will calculate the monthly percentage difference and the year-over- year growth by utilizing the lag function
 
 ```{r}
 USgas_xts_ma <- rollapply(USgas_xts, width = 12, FUN = mean)
@@ -177,13 +185,7 @@ USgas_month_diff <- 100 * (USgas_xts / lag(USgas_xts, n = 1) - 1)
 USgas_yoy_diff <- 100 * (USgas_xts / lag(USgas_xts, n = 12) - 1)
 ```
 
-We have prepared all the required inputs for the summary plot, we can start to
-build it. One of the downsides of the plot function is that it does not support pipes (that is,
-%>%), therefore, the plot and its additional features must run step by step in a sequential
-order. The first step is to create the main plot, which will include both the main series, the
-US natural gas consumption, and its moving average (using the merged data of both of
-these series). As we wish to overlay the moving average of the series on top of it, we will set
-the multi.panel argument to FALSE
+We have prepared all the required inputs for the summary plot, we can start to build it. One of the downsides of the plot function is that it does not support pipes (that is, %\>%), therefore, the plot and its additional features must run step by step in a sequential order. The first step is to create the main plot, which will include both the main series, the US natural gas consumption, and its moving average (using the merged data of both of these series). As we wish to overlay the moving average of the series on top of it, we will set the multi.panel argument to FALSE
 
 ```{r}
 plot.xts(USgas_merge,
@@ -219,4 +221,3 @@ addLegend(
   col = c("black", "green", "red")
 )
 ```
-

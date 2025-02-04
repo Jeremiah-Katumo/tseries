@@ -12,6 +12,332 @@ library(xts)
 ```
 
 ```{r}
+data("USVSales")
 
+ts_info(USVSales)
 ```
 
+### Simple Moving Average
+
+```{r}
+ts_plot(USVSales,
+        title = "US Monthly Total Vehicle Sales",
+        Ytitle = "Thousands of Units",
+        Xtitle = "Years",
+        Xgrid = TRUE,
+        Ygrid = TRUE)
+```
+
+```{r}
+# This lags function returns a time series with its l lags
+make_lags <- function(ts.obj, lags) {
+  ts_merged <- NULL
+  # creating lags
+  for (i in 1:lags) {
+    ts_merged <- ts.union(ts_merged, stats::lag(ts.obj, k = -i))
+  }
+  # Merge the lags with the original series
+  ts_merged <- ts.union(ts.obj, ts_merged)
+  # Set the column names
+  colnames(ts_merged) <- c("y", paste0("y_", 1:i))
+  # Removing missing values as result of creating the lags
+  ts_merged <- window(ts_merged,
+                      start = start(ts.obj) + lags,
+                      end = end(ts.obj))
+  
+  return(ts_merged)
+}
+```
+
+```{r}
+head(make_lags(USVSales, lags = 3))
+```
+
+```{r}
+ts_info(make_lags(USVSales, lags = 3))
+```
+
+-   The second and last step of this process is to calculate the arithmetic average of the series with its n lags. We will utilize the ts_sum function from the TSstudio package, which sums up the rows of the mts objects and returns a ts object.
+
+```{r}
+ts_mean <- function(mts.obj) {
+  ts_average <- ts_sum(mts.obj) / dim(mts.obj)[2]   # Simple average calculation
+  
+  return(ts_average)
+}
+```
+
+-   We can now finalize the simple_ma function by linking the lags and the average functions. Note that the input parameters of the simple_ma function are the series and the order of the SMA.
+
+```{r}
+simple_ma <- function(ts.obj, order) {
+  lags <- order - 1
+  lags <- make_lags(ts.obj = ts.obj, lags = 1)
+  mean <- ts_mean(lags)
+  un <- ts.union(ts.obj, mean)
+  colnames(un) <- c("Original", "Transformed")
+  
+  return(un)
+}
+```
+
+```{r}
+simple_ma4 <- simple_ma(USVSales, order = 4)
+
+ts_plot(simple_ma4, type = "multiple",
+        title = "US Vehicle Sales - SMA(order=4)",
+        Ytitle = "Thousands of Units",
+        Xtitle = "Years",
+        Xgrid = TRUE,
+        Ygrid = TRUE)
+```
+
+-   You can realize the effect fo the transformation as the preceding plot shows reduction of noise (or oscillation). The oscillation can be related to random noise.
+
+-   The remaining oscillation of the series is mainly related to the seasonal pattern of a time series and to the trend and cycle of the time series.
+
+```{r}
+simple_ma12 <- simple_ma(USVSales, order = 12)
+
+ts_plot(simple_ma12, type = "multiple",
+        title = "US Vehicle Sales - SMA(order=12)",
+        Ytitle = "Thousand of Units",
+        Xtitle = "Years",
+        Xgrid = TRUE,
+        Ygrid = TRUE)
+```
+
+### Two-Sided Moving Average
+
+-   The following code generates three versions of two-sided MA outputs with an order of 5, 11, and 12, using the ts_ma function. The first two outputs with an order of 5 and 11 are defined by setting the n parameter to 2 and 5. This yields a centered output, as the window of this function is symmetric. The third output of an order of 12 is uncentered, as its window is set to the past 6 and future 5 observations, using the n_left and n_right parameters
+
+```{r}
+two_sided_ma <- ts_ma(USVSales, 
+                      n = c(2, 5),   # Setting an order 5 and 11 moving average
+                      n_left = 6, n_right = 5, # Setting an order 12 moving average
+                      plot = TRUE,
+                      multiple = TRUE,
+                      margin = .04)
+```
+
+-   As you can see from the preceding graphs, the behavior of the two-sided MA is relatively similar to the one of the SMA, as we saw earlier. The higher the order of the function, the smoother the output. Of course, the smoothing effect comes at the cost of losing observations from both the start and end of the series. The loss of observations is a function of the order of the function, since the higher the order of the MA function, the higher the loss of observations.
+
+### Simple MA vs Two-Sided MA
+
+```{r}
+# Creating one-sided and two-sided moving average with an order of 12
+one_sided_ma12 <- ts_ma(USVSales, n = NULL, n_left = 11, plot = FALSE)
+two_sided_ma12 <- ts_ma(USVSales, n = NULL, n_left = 6, n_right = 5, plot = FALSE)
+```
+
+```{r}
+one_sided <- one_sided_ma12$unbalanced_ma_12
+two_sided <- two_sided_ma12$unbalanced_ma_12
+```
+
+```{r}
+moving_average <- cbind(USVSales, one_sided, two_sided)
+
+plt <- ts_plot(moving_average,
+               title = "One-Sided vs Two-Sided Moving Average - Order 12",
+               # Ytitle = "Thousands of Units",
+               # Xtitle = "Years",
+               Xgrid = TRUE,
+               Ygrid = TRUE,
+               type = "single")
+```
+
+```{r}
+plt <- plt %>% layout(legend = list(x = 0.05, y = 0.95),   # confidence interval
+                      yaxis = list(title = "Thousands of Units"),
+                      xaxis = list(title = "Year"))
+plt
+```
+
+-   Typically, time series data describes a continuous phenomenon over time, where each observation is relatively close in value or highly correlated to a certain degree with its past and future consecutive observations. Therefore, the use of a centered two-sided MA function (or close to centered when the order of the function is even) is generally more appropriate to apply as a smoother or data filter method. In the case of the one-sided MA function, it would make sense to use it when you need to have the most recent observations (as the loss of observations, in this case, is from the beginning of the series).
+
+### Time Series Components
+
+#### 1. The Cycle Component
+
+-   The definition of the cycle in a time series is derived from the broad definition of a cycle in macroeconomics. A cycle can be described as a sequence of repeatable events over time, where the starting point of a cycle is at a local minimum of the series and the ending point is at the next one, and the ending point of one cycle is the starting point of the following cycle.
+
+```{r}
+data("USUnRate")
+
+ts_info(USUnRate)
+```
+
+-   The USUnRate series is a ts object with a monthly frequency, and it starts in January 1948. As we do not need the full length of the series to view its cycles, we will use the window function to subset the series using January 1990 as the starting point, and plot it with the ts_plot function:
+
+```{r}
+unemployment <- window(USUnRate, start = c(1948, 1))
+
+ts_plot(unemployment, type = "single",
+        title = "US Monthly Unemployment Rate",
+        Ytitle = "Unemployment Rate (%)",
+        Xtitle = "Year",
+        Xgrid = TRUE,
+        Ygrid = TRUE)
+```
+
+#### 2. The Trend Component
+
+-   A trend, if it exists in time series data, represents the general direction of the series, either up or down, over time. Furthermore, a trend could have either linear or exponential growth (or close to either one), depending on the series characteristics. Use simulated data to demonstrate different types of trends, before starting to work with real-life data.
+
+```{r}
+set.seed(1234)
+
+ts_non_trend <- ts(runif(200, 5, 5.2),
+                   start = c(2000,1),
+                   frequency = 12)
+```
+
+```{r}
+ts_linear_trend_p <- ts_non_trend + 1:length(ts_non_trend) / (0.5 * length(ts_non_trend))
+
+ts_linear_trend_n <- ts_non_trend - 1:length(ts_non_trend) / (0.5 * length(ts_non_trend))
+
+ts_exp_trend <- ts_non_trend + exp((1:length(ts_non_trend) -1 ) / (0.5 * length(ts_non_trend))) - 1
+```
+
+```{r}
+merged_series <- merge(Baseline_No_Trend = as.xts(ts_non_trend),
+                       Positive_Linear_Trend = as.xts(ts_linear_trend_p),
+                       Negative_Linear_Trend = as.xts(ts_linear_trend_n),
+                       Exponential_Trend = as.xts(ts_exp_trend))
+```
+
+```{r}
+ts_plot(merged_series,
+        type = "single",
+        Xgrid = TRUE,
+        Ygrid = TRUE,
+        title = "Different Types of Trends",
+        Ytitle = "The Values of the Series",
+        Xtitle = "Year") %>%
+  layout(legend = list(x = 0.1, y = 0.9))
+```
+
+#### 3. The Seasonal Component
+
+```{r}
+seasonal_pattern <- sin(2*pi * (1:length(ts_non_trend)) / frequency(ts_non_trend))
+
+ts_seasonal <- ts_non_trend + seasonal_pattern
+
+ts_plot(ts_seasonal,
+        title = "Seasonal Pattern without Trend",
+        Xgrid = TRUE,
+        Ygrid = TRUE,
+        Ytitle = "The Values of the Series",
+        Xtitle = "Year")
+```
+
+```{r}
+seasonal_with_Ptrend <- ts_linear_trend_p + seasonal_pattern
+seasonal_with_Ntrend <- ts_linear_trend_n - seasonal_pattern
+seasonal_with_Etrend <- ts_exp_trend + seasonal_pattern
+
+merged_series_seasonal <- merge(Positive_Linear_Trend = as.xts(seasonal_with_Ptrend),
+                                Negative_Linear_Trend = as.xts(seasonal_with_Ntrend),
+                                Exponential_Trend = as.xts(seasonal_with_Etrend))
+```
+
+```{r}
+ts_plot(merged_series_seasonal,
+        type = "single",
+        Xgrid = TRUE,
+        Ygrid = TRUE,
+        title = "Seasonal Pattern with Trend",
+        Ytitle = "The Values of the Series",
+        Xtitle = "Year") %>%
+  layout(legend = list(x = 0.1, y = 0.9))
+```
+
+### The Cycle Component vs Seasonal Component
+
+-   We will use the ts_heatmap function from the TSstudio package to plot the heatmap of the monthly natural gas consumption (USgas) and the unemployment rate (USUnRate) in the US. While the first series (USgas) represents a time series with a strong seasonal pattern, the second (USUnRate), as we saw before, represents a series with a strong cycle pattern
+
+```{r}
+ts_heatmap(USgas, title = "Heatmap - the US Natural Gas Consumption")
+```
+
+-   As you can see from the heatmap plot of the USgas series, the color flow derives from the frequency units. In this case, the winter months, December and January, usually have the darkest color with respect to the rest of the months of the year. On the other hand, the months of May, June, and September consistently have the brightest color
+
+```{r}
+ts_heatmap(USUnRate, title = "Heatmap - The US Unemployment Rate")
+```
+
+-   In this example, the color flow of USUnRate is vertical, which indicates the state of the cycle. In this case, the brightest vertical strips represent the ending of one cycle and the beginning of the following one. Likewise, the darkest vertical strips represent the cycle peaks.
+
+### White Noise
+
+-   Paradoxically, the main pattern of a white noise series is the lake of patterns. A series is defined as white noise when there is no correlation between the series observations or patterns. In other words, the relationship between different observations is random. In many of the applications of white noise in time series, there are some assumptions made about the distribution of the white noise series. Typically, unless mentioned otherwise, we assume that white noise is an independent and identically distributed random variables (i.i.d), with a mean of 0 and a variance of . For instance, we can simulate white noise with the rnorm function and generate random numbers with a normal distribution of mean of 0 and variance of 1
+
+```{r}
+# set.seed(1234)
+white_noise <- ts(rnorm(12*10, mean = 0, sd = 1), start = c(2008, 1), frequency = 12)
+
+ts_plot(white_noise, title = "White Noise ~ N(0, 1)",
+        line.mode = "lines+markers",
+        Xgrid = TRUE,
+        Ygrid = TRUE,
+        Ytitle = "The Values of the Series")
+```
+
+-   There are a few methods for testing whether a time series is white noise:
+
+    -   The basic method is carried out by plotting and eyeballing the series to identify whether the variation of the series appears to be random or not.
+
+    -   We can measure the correlation between the series and its lags with the **autocorrelation function** (**ACF**). A series is considered to be white noise whenever there is no correlation between the series and its lag. The acf function from the stats package calculates the level of correlation between a series and its lags. We will use the acf function to calculate and plot the level of correlation of the white_noise series we created previously. The plot of the acf function describes the level of correlation between the series and its lags, where the x-axis represents the lag number and the y-axis represents the level of correlation between the series and the lags. The two dotted blue lines represent the null hypothesis that the level of correlation between the series and a lag is zero using a chi-square statistical test. Therefore, we would consider a lag to have some degree of correlation with the series only if the level of correlation is either above the upper or below the lower dotted line (that is, fails to reject the null hypothesis). In the case of the preceding white_noise series, there is only one significant lag with a relatively low level of correlation, and we can therefore conclude that the series is white noise. We will come back to the ACF function in Chapter 7, Correlation Analysis in order to go into more detail.
+
+    -   The Ljung-Box test is another statistical test to evaluate whether the series is correlated with its lags. In this case, the null hypothesis assumes that the lags are not correlated. Therefore, lags with lower p-values (with respect to the level of significance of the test) would be considered as being correlated with the series. The Box.test function, another stats package function, performs a Ljung-Box test on a series and a specific lag.
+
+```{r}
+x <- lapply(1:24, function(i) {
+  p <- Box.test(white_noise, lag = i, type = "Ljung-Box")
+  output <- data.frame(lag = i, p_value = p$p.value)
+  return(output) 
+}) %>% bind_rows
+
+head(x)
+```
+
+```{r}
+plot(x = x$lag,
+     y = x$p_value, 
+     ylim = c(0,1),
+     main = "Series white_noise - Ljung-Box Test",
+     xlab = "Lag", ylab = "P-Value")
+
+abline(h = 0.05, col="red", lwd=3, lty=2)
+```
+
+#### 4. The Irregular Component
+
+-   This component, which is the remainder between the series and structural components, provides an indication of irregular events in the series. This includes non-systematic patterns or events in the data, which cause irregular fluctuation. In addition, the irregular component could provide some indication of the appropriate fit of the other components when using a decomposing method. A high correlation in this component is an indication that some patterns related to one of the other components were leftover due to an inaccurate estimate.
+
+-   On the other hand, if the irregular component is not correlated with its lags (that is, a white noise), we can assume (depending on the series structure) that the estimation of the trend and seasonal components captured the majority of the information about the series structure. Later on in this chapter, we will see an example of the irregular component and its applications.
+
+### Decomposition of Time Series
+
+```{r}
+usv_decompose <- decompose(USVSales)
+
+str(usv_decompose)
+```
+
+```{r}
+class(usv_decompose)
+```
+
+```{r}
+plot(usv_decompose)
+```
+
+```{r}
+air_decompose <- decompose(AirPassengers, type = "multiplicative")
+
+plot(air_decompose)
+```
