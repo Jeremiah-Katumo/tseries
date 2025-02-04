@@ -79,3 +79,49 @@ ts_lags(USgas, lags = c(12, 24, 36, 48))
 ```
 
 ## Causality Analysis
+
+### The Cross-correlation Function
+
+```{r}
+ts_info(USUnRate)
+```
+
+```{r}
+ts_plot(USUnRate,
+        title = "US Monthly Civllian Unemployment Rate",
+        Ytitle = "Unemployment Rate (%)",
+        Xgrid = TRUE,
+        Ygrid = TRUE)
+```
+
+-   As you can observe in the preceding plot, the USUnRate series starts during the 1950s, as opposed to the USVSales series, which began in 1976. Therefore, before starting, let's align the two series to the same time frame using the window function:
+
+```{r}
+us_vsales <- window(USVSales, start = c(1976, 1), end = c(2019, 12))
+us_unrate <- window(USVSales, start = c(1976, 1), end = c(2019, 12))
+```
+
+```{r}
+plot_ly(x = time(us_vsales),
+        y = us_vsales,
+        type = "scatter",
+        mode = "line",
+        name = "Total Vehicle Sales") %>%
+  add_lines(x = time(us_unrate),
+            y = us_unrate,
+            name = "Unemployment Rate",
+            yaxis = "y2") %>%
+  layout(title = "Total Monthly Vehicle Sales vs Unemployment Rate in the US",
+         yaxis2 = list(overlaying = "y", side = "right", title = "Percentage", showgrid = TRUE),
+         yaxis = list(title = "THousands of Units", showgrid = TRUE),
+         legend = list(orientation = 'h'),
+         margin = list(l = 50, r = 50, b = 50, t = 50, pad = 2))
+```
+
+```{r}
+ccf(x = us_vsales, y = us_unrate, lag.max = 36)
+```
+
+```{r}
+ccf_plot(x = USVSales, y = USUnRate, lags = 0:12)
+```
