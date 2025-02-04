@@ -3,3 +3,79 @@ title: "coreelation-analysis"
 output: html_document
 author: @Jernerwal_Jeremy
 ---
+
+## Lags Analysis
+
+```{r}
+library(tidyverse)
+library(forecast)
+library(plotly)
+library(TSstudio)
+```
+
+```{r}
+ts_plot(USgas,
+        title = "US Monthly Natural Gas COnsumption",
+        Ytitle = "Billion Cubic Feet",
+        Xtitle = "Year",
+        Xgrid = TRUE,
+        Ygrid = TRUE)
+```
+
+```{r}
+ts_plot(EURO_Brent,
+        title = "Brent Crude Oil Prices",
+        Ytitle = "US Dollars per Barrel",
+        Xtitle = "Year",
+        Xgrid = TRUE,
+        Ygrid = TRUE)
+```
+
+```{r}
+ts_plot(USVSales,
+        title = "US Monthly Total Vehicle Sales",
+        Ytitle = "Thousands of Units",
+        Xtitle = "Year",
+        Xgrid = TRUE,
+        Ygrid = TRUE)
+```
+
+### The Autocorrelation Function
+
+```{r}
+acf(USgas, lag.max = 60)
+```
+
+```{r}
+acf(EURO_Brent, lag.max = 60)
+```
+
+```{r}
+acf(USVSales, lag.max = 60)
+```
+
+### The Partial Autocorrelation Function
+
+```{r}
+pacf(USgas, lag.max = 60)
+```
+
+### Lag Plots
+
+```{r}
+ts_lags(USgas)
+```
+
+```{r}
+ts_lags(USVSales)
+```
+
+```{r}
+ts_lags(EURO_Brent)
+```
+
+```{r}
+ts_lags(USgas, lags = c(12, 24, 36, 48))
+```
+
+## Causality Analysis
