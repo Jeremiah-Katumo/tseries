@@ -1,0 +1,223 @@
+---
+title: "Exploratory Data Analysis for Time Series Objects"
+output: html_document
+title: @Jernerwal_Jeremy
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r}
+library(ggplot2)
+library(tidyverse) 
+library(xts)
+library(zoo)
+library(TSstudio)
+```
+
+```{r}
+data(EURO_Brent)
+data("Michigan_CS")
+
+ts_info(EURO_Brent)
+```
+
+```{r}
+class(EURO_Brent)
+```
+
+```{r}
+frequency(EURO_Brent)
+```
+
+```{r}
+head(cycle(EURO_Brent), 12)
+```
+
+```{r}
+start(EURO_Brent)
+```
+
+```{r}
+end(EURO_Brent)
+```
+
+```{r}
+head(time(EURO_Brent), 12)
+```
+
+# Merging Time Series Objects
+
+```{r}
+class(index(EURO_Brent))
+```
+
+```{r}
+ts_info(Michigan_CS)
+```
+
+```{r}
+ts_info(EURO_Brent)
+```
+
+Therefore, in this case, the merge process is straightforward.
+
+```{r}
+xts_merge_outer <- merge.xts(Michigan_CS = Michigan_CS, EURO_Brent = EURO_Brent, join = "outer")
+
+ts_info(xts_merge_outer)
+```
+
+```{r}
+head(xts_merge_outer["1987"])
+```
+
+```{r}
+xts_merge_inner <- merge.xts(
+  Michigan_CS = Michigan_CS,
+  EURO_Brent = EURO_Brent,
+  join = "inner" 
+)
+
+ts_info(xts_merge_inner)
+```
+
+```{r}
+head(xts_merge_inner)
+```
+
+## Rolling Window
+
+```{r}
+EURO_Brent_3ma <- rollapply(EURO_Brent, width = 3, FUN = mean)
+
+ts_info(EURO_Brent_3ma)
+```
+
+```{r}
+EURO_Brent_3lag <- lag(EURO_Brent, n = 3)
+
+EURO_Brent_merge <- merge.zoo(EURO_Brent, EURO_Brent_3lag, join = "inner")
+
+head(EURO_Brent_merge)
+```
+
+```{r}
+plot.zoo(
+  EURO_Brent,
+  main = "Crude Oil Prices: Brent - Europe",
+  ylab = "USD per Barrel",
+  col = "blue"
+)
+```
+
+```{r}
+data("US_indicators")
+
+head(US_indicators)
+```
+
+```{r}
+names(US_indicators)
+```
+
+```{r}
+US_indicators_zoo <- zoo(
+  x = US_indicators[,c("Vehicle Sales", "Unemployment Rate")],
+  frequency = 12
+)
+```
+
+```{r}
+plot.zoo(
+  US_indicators_zoo,
+  main = "Date",
+  ylab = c("Vehicle Sales (Thousands of Units)", "Unemployment Rate (%)"),
+  col = c("blue", "red")
+)
+```
+
+```{r}
+plot.xts(
+  Michigan_CS,
+  subset = "2010/",
+  main = "University of Michigan Consumer Sentiment Index",
+  col = "blue",
+  grid.ticks.on = "years",
+  minor.ticks = "years"
+)
+```
+
+```{r}
+US_indicators_xts <- xts(
+  x = US_indicators[,c("Vehicle Sales", "Unemployment Rate")],
+  frequency = 12,
+  order.by = US_indicators$Date
+)
+```
+
+```{r}
+plot.xts(US_indicators_xts,
+  multi.panel = 2,
+  yaxis.same = FALSE,
+  grid.ticks.on = "years",
+  minor.ticks = FALSE,
+  main = "Monthly Vehicle Sales and Unemployment Rate in the US"
+)
+```
+
+```{r}
+data("USgas")
+
+USgas_xts <- as.xts(USgas)
+
+indexClass(USgas_xts)
+```
+
+Last but not least, we will calculate the monthly percentage difference and the year-over- year growth by utilizing the lag function
+
+```{r}
+USgas_xts_ma <- rollapply(USgas_xts, width = 12, FUN = mean)
+
+USgas_merge <- merge.xts(USgas = USgas_xts, USgas_smooth = USgas_xts_ma)
+
+USgas_month_diff <- 100 * (USgas_xts / lag(USgas_xts, n = 1) - 1)
+USgas_yoy_diff <- 100 * (USgas_xts / lag(USgas_xts, n = 12) - 1)
+```
+
+We have prepared all the required inputs for the summary plot, we can start to build it. One of the downsides of the plot function is that it does not support pipes (that is, %\>%), therefore, the plot and its additional features must run step by step in a sequential order. The first step is to create the main plot, which will include both the main series, the US natural gas consumption, and its moving average (using the merged data of both of these series). As we wish to overlay the moving average of the series on top of it, we will set the multi.panel argument to FALSE
+
+```{r}
+plot.xts(USgas_merge,
+         main = "US Natural Gas Consumption Summary",
+         multi.panel = FALSE,
+         col = c("black", "blue"),
+         ylim = c(1400, 3700))
+```
+
+```{r}
+lines(USgas_month_diff,
+      col = "green",
+      type = "h",
+      on = NA,
+      main = "Monthly Difference (%)")
+```
+
+```{r}
+lines(USgas_yoy_diff,
+      col = "red",
+      type = "h",
+      on = NA,
+      main = "YoY Growth Rate (%)")
+```
+
+```{r}
+addLegend(
+  legend.loc = "topleft",
+  on = 1,
+  legend.names = c("Gas Consumption", "Moving Average", "Monthly Diff. (%)", "YoY Change (%)"),
+  lty = c(1, 1),
+  lwd = c(2, 1),
+  col = c("black", "green", "red")
+)
+```

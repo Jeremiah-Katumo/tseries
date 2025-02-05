@@ -1,0 +1,218 @@
+---
+title: "forecasting"
+output: html_document
+---
+
+## Splitting and Training Data
+
+```{r}
+library(tidyverse)
+library(TSstudio)
+library(forecast)
+library(plotly)
+```
+
+```{r}
+ts_info(USgas)
+```
+
+```{r}
+gas_train <- window(USgas, start = time(USgas)[1], end = time(USgas)[length(USgas) - 12])
+gas_test <- window(USgas, start = time(USgas)[length(USgas) - 12 + 1], end = time(USgas)[length(USgas)])
+```
+
+```{r}
+ts_info(gas_train)
+```
+
+```{r}
+ts_info(gas_test)
+```
+
+## Forecasting Evaluation
+
+### Residual Analysis
+
+```{r}
+model <- auto.arima(gas_train)
+
+summary(model)
+```
+
+```{r}
+checkresiduals(model)
+```
+
+-   Starting with the output of the Ljung-Box test output, you will notice that, based on the P- value results, we can reject the null hypothesis with a level of significate of 0.01. Hence, there is an indication that the correlation between the residual series and its lags are different from zero. The ACP plot provides additional support for that as well. This indicates that the model did not fully capture all of the series patterns, and you may want to modify the model tuning parameters. The residual time series plot oscillates around the x-axis, with the exception of a few residuals, which cross the value of 250. This could indicate that some outliers occur during these periods.
+
+### Scoring the Forecast
+
+-   **Mean Squared Error (MSE):** This quantifies the average squared distance between the actual and forecasted values:
+
+    ![Mean Squared Error](images/mse.png){width="199"}
+
+    -   The squared effect of the error prevents positive and negative values from cancelling each other out and panelize the error score as the error rate increases.
+
+-   **Root Mean Squared Error (RMSE)**: This is the root of the average squared distance of the actual and forecasted values:
+
+    ![Root Mean Squared Error](images/rmse.png){width="317"}
+
+    -   Like MSE, the RMSE has a large error rate due to the squared effect and is therefore sensitive to outliers.
+
+-   **Mean Absolute Error (MAE)**: This measures the absolute error rate of the forecast:
+
+    ![Mean Absolute Error](images/mae.png){width="147"}
+
+    -   Similarly to MSE and RMSE, this method can only have positive values. This is so that is can avoid the cancellation of positive and negative values. On the other hand, there is no error penalization, and therefore this method is not sensitive to outliers.
+
+-   **Mean Absolute Percentage Error (MAPE):** This measures the average percentage absolute error:
+
+    ![Mean Absolute Percentage Error](images/mape.png){width="212"}
+
+```{r}
+model_fc <- forecast(model, h = 12)
+
+model_fc
+```
+
+-   Now that we've assigned the forecast to the fc object, we will use the accuracy function from the forecast package to score the model's performance with respect to the actual values in the testing partition:
+
+```{r}
+accuracy(model_fc, gas_test)
+```
+
+-   A fairly low error rate in the training set, along with the high error rate in the testing set, is clear indication that the model faces overfitting.
+
+```{r}
+test_forecast(actual = USgas,
+              forecast.obj = model_fc,
+              test = gas_test)
+```
+
+### Forecast Benchmark
+
+-   A simple naive approach typically assumes that the most recently observed value is the true representative of the future. Therefore, it will continue with the last value to infinity (or as the horizon of the forecast). We can create a naive forecast with the naive function from the forecast package and use the training set as the model input:
+
+```{r}
+naive_model <- naive(train, h = 12)
+
+test_forecast(actual = USgas, forecast.obj = naive_model, test = test)
+```
+
+```{r}
+accuracy(naive_model, gas_test)
+```
+
+-   In the case of the naive model, there is no training process, and the fitted values are set as the actual values (as you can see from the preceding plot). Since USgas has a strong seasonal pattern, it would make sense to use a seasonal naive model that takes into account seasonal variation. snaive_model from the forecast package uses the last seasonal point as a forecast of all of the corresponding seasonal observations. For example, if we are using monthly series, the value of the most recent January in the series will be used as the point forecast for all future January months:
+
+```{r}
+seasonal_naive_model <- snaive(train, h = 12)
+
+test_forecast(actual = USgas,
+              forecast.obj = seasonal_naive_model,
+              test = gas_test)
+```
+
+```{r}
+accuracy(seasonal_naive_model, gas_test)
+```
+
+-   It seems that the seasonal naive model has a better fit for the type of series we are forecasting, that is, USgas, due to its strong seasonal pattern (compared to the naive model). Therefore, we will use it as a benchmark for the ARIMA model. By comparing both the MAPE and RMSE of the two models in the testing partition, it is clear that the ARIMA model provides a lift (in terms of accuracy) with respect to the benchmark model:
+
+| Model Name     | MAPE | RMSE  |
+|----------------|------|-------|
+| ARIMA          | 3.2% | 103.2 |
+| seasonal naive | 5.2% | 164.7 |
+
+: Comparing MAPE and RMSE of arima and snaive
+
+## Finalizing the Forecast
+
+```{r}
+final_model <- auto.arima(USgas)
+
+final_forecast <- forecast(final_model, h = 12)
+
+plot_forecast(final_forecast,
+              title = "The US Natural Gas Consumption Forecast",
+              Ytitle = "Billion Cubic Feet",
+              Xtitle = "Year")
+```
+
+## Handling Forecasting Uncertainty
+
+### Confidence Interval
+
+```{r}
+final_forecast2 <- forecast(final_model, h = 60, level = c(80, 90))
+
+plot_forecast(final_forecast2, 
+              title = "The US Natural Gas Consumption Forecast",
+              Ytitle = "Billion Cubic Feet",
+              Xtitle = "Year")
+```
+
+### Simulation
+
+```{r}
+final_forecast3 <- forecast_sim(final_model, h = 60, n = 500)
+```
+
+```{r}
+final_forecast3$plot %>%
+  layout(title = "US Natural Gas Consumption - Forecasting Simulation",
+         yaxis = list(title = "Billion Cubic Feet"),
+         xaxis = list(title = "Year"))
+```
+
+### Horse Race Approach
+
+-   Last but not least, we will end this chapter with a robust forecasting approach that combines what we've learned so far in this chapter. The horse race approach is based on training, testing, and evaluating multiple forecasting models and selecting the model that performs the best on the testing partitions. In the following example, we will apply horse racing between seven different models (we will review the models in the upcoming chapters; for now, don't worry if you are not familiar with them) using six periods of backtesting. The ts_backtesting function from the TSstudio package conducts the full process of training, testing, evaluating, and then forecasting, using the model that performed the best on the backtesting testing partitions. By default, the model will test the following models:
+
+    1.  **auto.arima**: Automated ARIMA model
+
+    2.  **bsts**: Bayesian structural time series model
+
+    3.  **ets**: Exponential smoothing state space model
+
+    4.  **hybrid**: An ensemble of multiple models
+
+    5.  **nnetar**: Neural network time series model
+
+    6.  **tbats**: Exponential smoothing state space model, along with Box-Cox transformation, trend, ARMA errors, and seasonal components
+
+    7.  **HoltWinters**: Holt-Winters filtering
+
+```{r}
+set.seed(1234)
+```
+
+```{r}
+USgas_forecast <- ts_backtesting(ts.obj = USgas,
+                                  periods = 6,
+                                  models = "abehntw",
+                                  error = "MAPE",
+                                  window_size = 12,
+                                  h = 60,
+                                  plot = FALSE)
+```
+
+```{r}
+USgas_forecast$summary_plot
+```
+
+```{r}
+library(greybox)
+tsbacktest(USgas, models = "auto")
+```
+
+```{r}
+# library(modeltime)
+library(timetk)
+
+# Split the dataset into training and testing
+splits <- initial_time_split(USgas, prop = 0.8)
+
+# Perform backtesting
+resample <- time_series_cv(splits$data, assess = 6, cumulative = FALSE)
+```
