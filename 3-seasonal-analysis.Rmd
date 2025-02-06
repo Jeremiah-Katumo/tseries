@@ -61,6 +61,7 @@ head(USgas_df)
 ```
 
 ```{r}
+# Group by month and check the mean and standard deviation of the USgas_df
 USgas_summary <- USgas_df %>% 
   group_by(month) %>%
   summarise(mean = mean(USgas),
@@ -70,9 +71,17 @@ USgas_summary
 ```
 
 ```{r}
-plot_ly(data = USgas_summary, x = ~month, y = ~mean, type = "bar", name = "Mean") %>%
-  layout (title = "USgas - Monthly Average", yaxis = list(title = "Mean", range = c(1500, 2700)))
+plot_ly(data = USgas_summary, 
+        x = ~month, 
+        y = ~mean, 
+        type = "bar", 
+        name = "Mean"
+       ) %>%
+  layout (title = "USgas - Monthly Average", 
+          yaxis = list(title = "Mean", range = c(1500, 2700)))
 ```
+
+-   You can see from the summary statistic table of the series that, on average, each month is different from the next consecutive month by its standard deviation with the exception of the two pairs May/June and July/August, which are relatively close to each other. This allows us to characterize some months with a distinct behavior from the rest, such as January, February, March, and November. It is worth mentioning that the variation in the monthly averages mainly results in the series trend as we saw in the previous chapter, with the decomposing function that shifts up the series from year to year. In the case of a linear trend, detrending the series won't change the monthly difference by much as it will shift the series down in the same proportion. On the other hand, it will reduce the variation (that is, the standard deviation) of the monthly average, as it will be aligning each observation closer to its frequency unit peers
 
 ```{r}
 UKgrid_df <- data.frame(time = index(UKgrid_xts), UKgrid = as.numeric(UKgrid_xts))
@@ -80,7 +89,7 @@ UKgrid_df <- data.frame(time = index(UKgrid_xts), UKgrid = as.numeric(UKgrid_xts
 str(UKgrid_df)
 ```
 
--   The next step is to create seasonal features based on the periods we wish to check. For this, we will use the lubridate package to create indicators for the hour of the day, the day of the week, and the month by using the hour, wday, and month functions respectively. This will allow us to group and summarize the series based on each periodicity.
+-   The next step is to create seasonal features based on the periods we wish to check. For this, we will use the *lubridate* package to create indicators for the hour of the day, the day of the week, and the month by using the *hour*, *wday*, and *month* functions respectively. This will allow us to group and summarize the series based on each periodicity.
 
 ```{r}
 UKgrid_df$hour <- hour(UKgrid_df$time)
@@ -104,8 +113,10 @@ UKgrid_hourly
 # Plotting the mean and sd
 plot_ly(UKgrid_hourly) %>%
   add_lines(x = ~hour, y = ~mean, name = "Mean") %>%
-  add_lines(x = ~hour, y = ~sd, name = "Standard Deviation", yaxis = "y2",
-            line = list(color = "red", dash = "dash", width = 3)) %>%
+  add_lines(
+    x = ~hour, y = ~sd, name = "Standard Deviation", yaxis = "y2",
+    line = list(color = "red", dash = "dash", width = 3)
+  ) %>%
   layout(title = "UK Grid National Demand - Hourly Average vs. Standard Deviation",
          yaxis = list(title = "Mean"),
          yaxis2 = list(overlaying = "y", side = "right", title = "Standard Deviation"),
@@ -130,7 +141,7 @@ plot_ly(UKgrid_hourly) %>%
 UKgrid_weekday <- UKgrid_df %>%
   filter(hour == 3 | hour == 9) %>%
   group_by(hour, weekday) %>%
-  summarise(mean = mean(UKgrid, na.rm = TRUE, sd = sd(UKgrid)))
+  summarise(mean = mean(UKgrid, na.rm = TRUE), sd = sd(UKgrid, na.rm = TRUE))
 
 UKgrid_weekday
 ```
@@ -142,7 +153,12 @@ UKgrid_weekday
 ```
 
 ```{r}
-plot_ly(data = UKgrid_weekday, x = ~weekday, y = ~mean, type = "bar", color = ~hour) %>%
+plot_ly(data = UKgrid_weekday, 
+        x = ~weekday, 
+        y = ~mean, 
+        type = "bar", 
+        color = ~hour
+       ) %>%
   layout(title = "The Hourly Average Demand by Weekday",
          yaxis = list(title = "Mean", range = c(30000, 75000)),
          xaxis = list(title = "Weekday"))

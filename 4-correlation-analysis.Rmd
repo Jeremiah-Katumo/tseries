@@ -82,6 +82,8 @@ ts_lags(USgas, lags = c(12, 24, 36, 48))
 
 ### The Cross-correlation Function
 
+-   The cross-correlation function (CCF) is the sister function of the ACF and it measures the level of correlation between two series and their lags in a fairly similar way. In the coming example, we will analyze the relationship between the total vehicle sales (USVSales) and the unemployment rate (USUnRate) in the US to understand whether there is a cause and effect relationship between the two. The monthly unemployment rate in the US is available in the TSstudio package, so let's load the series and review it with the ts_plot function.
+
 ```{r}
 ts_info(USUnRate)
 ```
@@ -97,8 +99,24 @@ ts_plot(USUnRate,
 -   As you can observe in the preceding plot, the USUnRate series starts during the 1950s, as opposed to the USVSales series, which began in 1976. Therefore, before starting, let's align the two series to the same time frame using the window function:
 
 ```{r}
-us_vsales <- window(USVSales, start = c(1976, 1), end = c(2019, 12))
-us_unrate <- window(USVSales, start = c(1976, 1), end = c(2019, 12))
+us_vsales <- window(USVSales, start = c(1976, 1), end = c(2018, 12))
+us_unrate <- window(USVSales, start = c(1976, 1), end = c(2018, 12))
+```
+
+```{r}
+head(us_vsales)
+```
+
+```{r}
+us_combined <- cbind(us_vsales, us_unrate)
+
+us_combined <- as.data.frame(us_combined)
+
+head(us_combined)
+```
+
+```{r}
+names(us_combined)
 ```
 
 ```{r}
