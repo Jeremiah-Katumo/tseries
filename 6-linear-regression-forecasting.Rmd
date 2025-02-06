@@ -148,7 +148,7 @@ lm_model_plot(data = USgas_df,
 
 -   Overall, the model was able to capture the general movement of the trend, yet a linear trend may fail to capture the structural break of the trend that occurred around 2010.
 
--    Lastly, for comparison analysis, we want to measure the model error rate both in the training and the testing sets
+-   Lastly, for comparison analysis, we want to measure the model error rate both in the training and the testing sets
 
 ```{r}
 trend_mape <- c(mean(abs(gas_train$y - gas_train$yhat) / gas_train$y),
