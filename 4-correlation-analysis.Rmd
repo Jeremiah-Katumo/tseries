@@ -36,11 +36,11 @@ ts_plot(USVSales,
 
 ### The Autocorrelation Function
 
--   The autocorrelation function (ACF) is the main method in time series analysis for quantifying the level of correlation between a series and its lags. This method is fairly similar (both mathematically and logically) to the Pearson correlation coefficient, which we saw earlier, and can be formalized with the following expression.
+-   The **autocorrelation function** (**ACF**) is the main method in time series analysis for quantifying the level of correlation between a series and its lags. This method is fairly similar (both mathematically and logically) to the Pearson correlation coefficient, which we saw earlier, and can be formalized with the following expression.
 
 ![Pearson Correlation Coefficient](images/pearson%20correlation.png){width="258"}
 
--   Here, represents the ACF correlation coefficient of the series with its k lag; and n, and x denote the number of observations of the series, the t observation of the series, and the mean, respectively.
+-   The equation above represents the ACF correlation coefficient of the series with its k lag; and n, and x denote the number of observations of the series, the t observation of the series, and the mean, respectively.
 
 ```{r}
 acf(USgas, lag.max = 60)
@@ -78,7 +78,7 @@ ts_lags(EURO_Brent)
 ts_lags(USgas, lags = c(12, 24, 36, 48))
 ```
 
-## Causality Analysis
+## Causality Analysis (Naive Bayes)
 
 ### The Cross-correlation Function
 
