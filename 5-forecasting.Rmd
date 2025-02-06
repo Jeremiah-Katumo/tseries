@@ -207,12 +207,12 @@ tsbacktest(USgas, models = "auto")
 ```
 
 ```{r}
-# library(modeltime)
+library(modeltime)
 library(timetk)
 
 # Split the dataset into training and testing
-splits <- initial_time_split(USgas, prop = 0.8)
+# splits <- initial_time_split(USgas, prop = 0.8)
 
 # Perform backtesting
-resample <- time_series_cv(splits$data, assess = 6, cumulative = FALSE)
+resample <- time_series_cv(as.data.frame(gas_train), assess = 6, cumulative = FALSE)
 ```
