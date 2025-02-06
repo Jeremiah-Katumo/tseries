@@ -43,7 +43,7 @@ summary(model)
 checkresiduals(model)
 ```
 
--   Starting with the output of the Ljung-Box test output, you will notice that, based on the P- value results, we can reject the null hypothesis with a level of significate of 0.01. Hence, there is an indication that the correlation between the residual series and its lags are different from zero. The ACP plot provides additional support for that as well. This indicates that the model did not fully capture all of the series patterns, and you may want to modify the model tuning parameters. The residual time series plot oscillates around the x-axis, with the exception of a few residuals, which cross the value of 250. This could indicate that some outliers occur during these periods.
+-   Starting with the output of the ***Ljung-Box*** test output, you will notice that, based on the P-value results, we can reject the null hypothesis with a level of significate of 0.01. Hence, there is an indication that the correlation between the residual series and its lags are different from zero. The ***ACP*** plot provides additional support for that as well. This indicates that the model did not fully capture all of the series patterns, and you may want to modify the model tuning parameters. The residual time series plot oscillates around the x-axis, with the exception of a few residuals, which cross the value of 250. This could indicate that some outliers occur during these periods.
 
 ### Scoring the Forecast
 
@@ -75,7 +75,7 @@ model_fc <- forecast(model, h = 12)
 model_fc
 ```
 
--   Now that we've assigned the forecast to the fc object, we will use the accuracy function from the forecast package to score the model's performance with respect to the actual values in the testing partition:
+-   Now that we've assigned the forecast to the model_fc object, we will use the accuracy function from the forecast package to score the model's performance with respect to the actual values in the testing partition:
 
 ```{r}
 accuracy(model_fc, gas_test)
