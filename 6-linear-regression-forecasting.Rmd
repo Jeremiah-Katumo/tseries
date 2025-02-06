@@ -1,0 +1,441 @@
+---
+title: "linear-regression-forecasting"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(plotly)
+library(forecast)
+library(UKgrid)
+library(xts)
+library(TSstudio)
+```
+
+## The OLS Assumptions
+
+-   The OLS model's main assumptions are the following:
+
+    -   The model coefficients must follow a linear structure (for example, ![](images/ols.png){width="90"} is a linear model but ![](images/ols2.png){width="85" height="27"} is not).
+
+    -   There is no perfect collinearity between independent variables ![](images/image.3PWK12.png){width="90" height="14"}. In other words, none of the independent variables are a linear combination of any of the other independent variables.
+
+    -   All the independent variables must be a non-zero variance (or non-constant).
+
+    -   The error term ![](images/error.png){width="8"}, conditioned on the matrix of independent variables X, is an i**ndependent and identically distributed** (i.i.d) variable with mean 0 and constant variance ![](images/variance.png){width="13"}.
+
+    -   Both the dependent and independent variables draw from the population in a random sample. This assumption does not hold when regressing time series data, as typically the observations have some degree of correlation. Therefore, this assumption is relaxed when regressing time series data.
+
+## Forecasting with Linear Regression
+
+-   Forecasting with a linear regression model is mainly based on the following two steps:
+
+    1.  Identifying the series structure, key characteristics, patterns, outliers, and other features.
+
+    2.  Transforming those features into input variables and regressing them with the series to create a forecasting model.
+
+-   The core features of a linear regression forecasting model are the trend and seasonal components. The next section focuses on identifying the series trend and seasonal components and then transforming them into input variables of the regression model.
+
+### Features Engineering of the Series Components
+
+```{r}
+ts_plot(USgas,
+        title = "US Monthly Natural Gas consumption",
+        Ytitle = "Billion Cubic Feet",
+        Xtitle = "Year")
+```
+
+```{r}
+ts_info(USgas)
+```
+
+```{r}
+ts_decompose(USgas)
+```
+
+-   You can see in the preceding plot that the trend of the series is fairly flat between 2000 and 2010, and has a fairly linear growth moving forward. Therefore, the overall trend between 2000 and 2018 is not strictly linear. This is an important insight that will help us to define the trend input for the regression model.
+
+-   Before using the lm function, the built-in R linear regression function from the stats package, we will have to transform the series from a ts object to a data.frame object. Therefore, we will utilize the ts_to_prophet function from the TSstudio package.
+
+```{r}
+USgas_df <- ts_to_prophet(USgas)
+
+head(USgas_df)
+```
+
+-   After we transform the series into a data.frame object, we can start to create the regression input features. The first feature we will create is the series trend. A basic approach for constructing the trend variable is by indexing the series observations in chronological order
+
+```{r}
+USgas_df$trend <- 1:nrow(USgas_df)
+
+head(USgas_df)
+```
+
+-   The second feature we want to create is the seasonal component. Since we want to measure the contribution of each frequency unit to the oscillation of the series, we will use a categorical variable for each frequency unit. In the case of the USgas series, the frequency units represent the months of the year, and, therefore, we will create a categorical variable with 12 categories, each category corresponding to a specific month of the year. We will use the month function from the lubridate package to extract the month of the year from the ds date variable:
+
+```{r}
+USgas_df$seasonal <- factor(month(USgas_df$ds, label = TRUE), ordered = FALSE)
+
+head(USgas_df)
+```
+
+-   Last but not least, before we start to regress the series with those features, we will split the series into a training and testing partition. We will set the last 12 months of the series as a testing partition'
+
+```{r}
+h <- 12 # setting a testing partition length
+gas_train <- USgas_df[1:(nrow(USgas_df) - h), ]
+gas_test <- USgas_df[(nrow(USgas_df) - h + 1):nrow(USgas_df), ]
+```
+
+### Modeling the series trend and seasonal components
+
+```{r}
+model_trend <- lm(y ~ trend, data = gas_train)
+
+summary(model_trend)
+```
+
+-   As you can see from the preceding regression output, the coefficient of the trend variable is statistically significant to a level of 0.001. However, the adjusted R-squared of the regression is fairly low, which generally makes sense, as most of the series variation of the series is related to the seasonal pattern as we saw in the plots previously.
+
+-   There's a Type I error whereby the p-value shows the probability of rejecting the null hypothesis given it is actually true. So, the p-value is lower than 0.05 and therefore, we reject the null hypothesis with a level of significance of ![](images/alpha.png){width="10" height="9"} = 0.001.
+
+-   Predict both fitted and forecasted values:
+
+```{r}
+gas_train$yhat <- predict(model_trend, newdata = gas_train)
+
+gas_test$yhat <- predict(model_trend, newdata = gas_test)
+```
+
+```{r}
+head(gas_train, 1)
+```
+
+```{r}
+tail(gas_test, 1)
+```
+
+```{r}
+lm_model_plot <- function(data, train, test, title = NULL) {
+  p <- plot_ly(data = data,
+               x = ~ ds, y = ~ y,
+               type = "scatter",
+               mode = "line",
+               name = "Actual") %>%
+    add_lines(x = ~ train$ds,
+              y = ~ train$yhat,
+              line = list(color = "red"),
+              name = "Fitted") %>%
+    add_lines(x = ~ test$ds,
+              y = ~ test$yhat,
+              line = list(color = "green", dash = "dot", width = 3),
+              name = "Forecasted") %>%
+    layout(title = title,
+           xaxis = list(title = "Year"),
+           yaxis = list(title = "Billion Cubic Feet"),
+           legend = list(x = 0.05, y = 0.95))
+  
+  return(p)
+}
+```
+
+```{r}
+lm_model_plot(data = USgas_df,
+              train = gas_train,
+              test = gas_test,
+              title = "Predicting Trend of the Series")
+```
+
+-   Overall, the model was able to capture the general movement of the trend, yet a linear trend may fail to capture the structural break of the trend that occurred around 2010.
+
+-    Lastly, for comparison analysis, we want to measure the model error rate both in the training and the testing sets
+
+```{r}
+trend_mape <- c(mean(abs(gas_train$y - gas_train$yhat) / gas_train$y),
+                mean(abs(gas_test$y - gas_test$yhat) / gas_test$y))
+
+trend_mape
+```
+
+| Partition             | MAPE      |
+|-----------------------|-----------|
+| Train set (gas_train) | 0.1644088 |
+| Test set (gas_test)   | 0.1299951 |
+
+```{r}
+model_seasonal <- lm(y ~ seasonal, data = gas_train)
+
+summary(model_seasonal)
+```
+
+```{r}
+gas_train$yhat <- predict(model_seasonal, newdata = gas_train)
+gas_test$yhat <- predict(model_seasonal, newdata = gas_test)
+
+lm_model_plot(data = USgas_df,
+              train = gas_train,
+              test = gas_test,
+              title = "Predicting Seasonality of the Series")
+```
+
+```{r}
+seasonal_mape <- c(mean(abs(gas_train$y - gas_train$yhat) / gas_train$y),
+                mean(abs(gas_test$y - gas_test$yhat) / gas_test$y))
+
+seasonal_mape
+```
+
+```{r}
+model_comb <- lm(y ~ seasonal + trend, data = gas_train)
+
+summary(model_comb)
+```
+
+```{r}
+gas_train$yhat <- predict(model_comb, newdata = gas_train)
+gas_test$yhat <- predict(model_comb, newdata = gas_test)
+
+lm_model_plot(data = USgas_df,
+              train = gas_train,
+              test = gas_test,
+              title = "Predicting Trend and Seasonality Components")
+```
+
+```{r}
+comb_mape <- c(mean(abs(gas_train$y - gas_train$yhat) / gas_train$y),
+                mean(abs(gas_test$y - gas_test$yhat) / gas_test$y))
+
+comb_mape
+```
+
+#### polynomial component
+
+```{r}
+model_poly <- lm(y ~ seasonal + trend + I(trend^2), data = gas_train)
+
+summary(model_poly)
+```
+
+```{r}
+gas_train$yhat <- predict(model_poly, newdata = gas_train)
+gas_test$yhat <- predict(model_poly, newdata = gas_test)
+
+lm_model_plot(data = USgas_df,
+              train = gas_train,
+              test = gas_test,
+              title = "Predicting Trend (Polynomial) and Seasonality Components")
+```
+
+```{r}
+poly_mape <- c(mean(abs(gas_train$y - gas_train$yhat) / gas_train$y),
+                mean(abs(gas_test$y - gas_test$yhat) / gas_test$y))
+
+poly_mape
+```
+
+### The tslm function
+
+```{r}
+USgas_split <- ts_split(USgas, sample.out = h)
+
+train.ts <- USgas_split$train
+test.ts <- USgas_split$test
+```
+
+```{r}
+model_tslm <- tslm(train.ts ~ season + trend + I(trend^2))
+
+summary(model_tslm)
+```
+
+```{r}
+r <- which(USgas_df$ds == as.Date("2014-01-01"))
+
+USgas_df$s_break <- ifelse(year(USgas_df$ds) >= 2010, 1, 0)
+USgas_df$s_break[r] <- 1
+```
+
+```{r}
+model_tslm2 <- tslm(USgas ~ season + trend + I(trend^2) + s_break, data = USgas_df)
+
+summary(model_tslm2)
+```
+
+## Forecasting a series with multi-seasonality components
+
+```{r}
+UKdaily <- extract_grid(type = "data.frame",
+                   columns = "ND",
+                   aggregate = "daily")
+
+head(UKdaily)
+```
+
+```{r}
+ts_info(as.xts(UKdaily))
+```
+
+```{r}
+ts_plot(UKdaily,
+        title = "The UK National Demand for Electricity",
+        Ytitle = "MW",
+        Xtitle = "Year")
+```
+
+```{r}
+ts_heatmap(UKdaily[which(year(UKdaily$TIMESTAMP) >= 2016), ], 
+           title = "UK Daily National Grid Demand Heatmap")
+```
+
+## Preprocessing and feature engineering
+
+```{r}
+UKdaily <- UKdaily %>%
+  mutate(weekday = wday(TIMESTAMP, label = TRUE),
+         month = month(TIMESTAMP, label = TRUE),
+         hour = factor(hour(TIMESTAMP), ordered = TRUE),
+         lag365 = dplyr::lag(ND, 365)) %>%
+  filter(!is.na(lag365)) %>%
+  arrange(TIMESTAMP)
+
+str(UKdaily)
+```
+
+```{r}
+head(UKdaily)
+```
+
+```{r}
+start_date <- min(UKdaily$TIMESTAMP)
+
+start <- c(year(start_date), yday(start_date))
+
+UK_ts <- xts(x = UKdaily,
+             order.by = UKdaily$TIMESTAMP,
+             frequency = 12)
+```
+
+```{r}
+head(UK_ts)
+```
+
+```{r}
+typeof(UK_ts)
+```
+
+```{r}
+h <- 365
+```
+
+```{r}
+UKdaily <- extract_grid(type = "data.frame",
+                   columns = "ND",
+                   aggregate = "daily")
+
+UK_ts <- ts(UKdaily$ND,
+             start = start,
+             frequency = 365)
+```
+
+```{r}
+UKpartitions <- ts_split(UK_ts, sample.out = h)
+
+train_ts <- UKpartitions$train
+test_ts <- UKpartitions$test
+```
+
+```{r}
+train_df <- UKdaily[1:(nrow(UKdaily) - h), ]
+test_df <- UKdaily[(nrow(UKdaily) - h + 1):nrow(UKdaily), ]
+```
+
+## Training and testing the forecasting model
+
+```{r}
+model_tslm3 <- tslm(train_ts ~ season + trend)
+
+model_forecast <- forecast(model_tslm3, h = h)
+```
+
+```{r}
+test_forecast(actual = UK_ts, 
+              forecast.obj = model_forecast,
+              test = test_ts)
+```
+
+```{r}
+accuracy(model_forecast, test_ts)
+```
+
+```{r}
+UKdaily <- UKdaily %>%
+  mutate(weekday = wday(TIMESTAMP, label = TRUE),
+         month = month(TIMESTAMP, label = TRUE),
+         hour = factor(hour(TIMESTAMP), ordered = TRUE),
+         lag365 = dplyr::lag(ND, 365)) %>%
+  filter(!is.na(lag365)) %>%
+  arrange(TIMESTAMP)
+
+start_date <- min(UKdaily$TIMESTAMP)
+start <- c(year(start_date), yday(start_date))
+UK_ts <- ts(UKdaily$ND,
+             start = start,
+             frequency = 365)
+
+UKpartitions <- ts_split(UK_ts, sample.out = h)
+train_ts <- UKpartitions$train
+test_ts <- UKpartitions$test
+
+train_df <- UKdaily[1:(nrow(UKdaily) - h), ]
+test_df <- UKdaily[(nrow(UKdaily) - h + 1):nrow(UKdaily), ]
+```
+
+```{r}
+head(train_ts)
+```
+
+```{r}
+model_tslm4 <- tslm(train_df ~ season + trend + weekday + month, data = train_df)
+
+model_forecast2 <- forecast(model_tslm4, h = h)
+```
+
+### Model Selection
+
+```{r}
+anova(model_tslm4)
+```
+
+```{r}
+final_model <- tslm(UK_ts ~ season + trend + wday + month + lag365, data = UKdaily)
+```
+
+## Residual Analysis
+
+```{r}
+checkresiduals(final_model)
+```
+
+## Finalizing the Forecast
+
+```{r}
+UK_fc_df <- data.frame(date = seq.Date(from = max(UKdaily$TIMESTAMP) + days(1), 
+                                       by = "day", length.out = h))
+```
+
+```{r}
+UK_fc_df$wday <- factor(wday(UK_fc_df$date, label = TRUE), ordered = FALSE)
+UK_fc_df$month <- factor(month(UK_fc_df$date, label = TRUE), ordered = FALSE)
+UK_fc_df$lag365 <- tail(UKdaily$ND, h)
+```
+
+```{r}
+UKgrid_fc <- forecast(final_md, h = h, newdata = UK_fc_df)
+```
+
+```{r}
+plot_forecast(UKgrid_fc,
+              title = "The UK National Demand for Electricity Forecast",
+              Ytitle = "MW",
+              Xtitle = "Year")
+```
