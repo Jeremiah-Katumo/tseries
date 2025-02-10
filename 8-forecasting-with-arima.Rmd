@@ -1,0 +1,9 @@
+```{r}
+library(forecast)
+library(TSstudio)
+library(tidyverse)
+library(plotly)
+library(stats)
+library(base)
+library(datasets)
+```
