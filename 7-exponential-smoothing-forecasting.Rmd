@@ -468,10 +468,6 @@ plot_grid(deep_grid)
 ```
 
 ```{r}
-plot_grid(deep_grid, type = "3D", top = 250)
-```
-
-```{r}
 model_hw_grid <- HoltWinters(train, alpha = deep_grid$alpha, beta = deep_grid$beta, 
                              gamma = deep_grid$gamma)
 
