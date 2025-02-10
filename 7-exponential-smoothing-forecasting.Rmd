@@ -43,6 +43,237 @@ ts_plot(arabica,
         Xtitle = "Year")
 ```
 
+## Simple Moving Average
+
+```{r}
+simple_moving_average <- function(df, horizon, m, weight = NULL) {
+  # Error handling
+  if (horizon > nrow(df)) {
+    stop("The length of the forecast horizon must be shorter than the length of the series")
+  }
+  
+  if (m > nrow(df)) {
+    stop("The length of the rolling windoe must be shorter than the length of the series.")
+  }
+  
+  if (!is.null(weight)) {
+    if (length(weight) != m) {
+      stop("The weight argument is not aligned with the length of the rolling window.")
+    } else if (sum(weight) != 1) {
+      stop("The sum of the average weight is different")
+    }
+  }
+  
+  # Setting the average weights
+  if (is.null(weight)) {
+    weight <- rep(1 / m, m)
+  }
+  
+  # Setting the dataframe
+  names(df)[1] <- "date"
+  # Set train and test sets according to forecast horizon
+  df$type <- c(rep("train", nrow(df) - horizon), 
+               rep("test", horizon))
+  # Spreading the table by partition
+  df1 <- df %>% spread(key = type, value = y)
+  
+  # create target variable
+  df1$yhat <- df1$train
+  
+  # simple moving average
+  for (i in (nrow(df) - horizon + 1):nrow(df1)) {
+    r <- (i - m):(i - 1)
+    df1$yhat[i] <- sum(df1$yhat[r] * weight)
+  }
+  
+  # dropping from the yhat variable the actual values
+  # that were used for the rolling window
+  df1$yhat <- ifelse(is.na(df1$test), NA, df1$yhat)
+  
+  df1$y <- ifelse(is.na(df1$test), df1$train, df1$test)
+  
+  return(df1)
+}
+```
+
+-   The function arguments are as follows:
+
+    -   *df*: The input series in a two-column data frame format, where the first column is a Date object and the second one is the actual values of the series.
+
+    -   *horizon*: The horizon of the forecast. For the purpose of the following example, the function set the last *horizon* observations as a testing set. This allows us to compare model performance.
+
+    -   *m*: The length of the rolling window.
+
+    -   *weight*: The weights of the average, by default, using equal weights (or arithmetic average).
+
+-   Let's utilize this function to demonstrate the performance of the SMA function. We will forecast the last 24 months of the Robusta series using a rolling window of 3, 6, 12, 24, and 36 months
+
+```{r}
+robusta_df <- ts_to_prophet(robusta)
+
+robusta_fc_m1 <- simple_moving_average(robusta_df, horizon = 24, m = 1)
+robusta_fc_m6 <- simple_moving_average(robusta_df, horizon = 24, m = 6)
+robusta_fc_m12 <- simple_moving_average(robusta_df, horizon = 24, m = 12)
+robusta_fc_m24 <- simple_moving_average(robusta_df, horizon = 24, m = 24)
+robusta_fc_m36 <- simple_moving_average(robusta_df, horizon = 24, m = 36)
+robusta_fc_m48 <- simple_moving_average(robusta_df, horizon = 24, m = 48)
+robusta_fc_m60 <- simple_moving_average(robusta_df, horizon = 24, m = 60)
+```
+
+```{r}
+plot_ly(data = robusta_df[650:nrow(robusta_df),], x = ~ ds, y = ~ y, type = "scatter", 
+        mode = "lines", name = "Actual") %>%
+  add_lines(x = robusta_fc_m1$date, y = robusta_fc_m1$yhat, name = "Simple Moving Average - 1",
+            line = list(dash = "dash")) %>%
+  add_lines(x = robusta_fc_m6$date, y = robusta_fc_m6$yhat, name = "Simple Moving Average - 6",
+            line = list(dash = "dash")) %>%
+  add_lines(x = robusta_fc_m12$date, y = robusta_fc_m12$yhat, name = "Simple Moving Average - 12",
+            line = list(dash = "dash")) %>%
+  add_lines(x = robusta_fc_m24$date, y = robusta_fc_m24$yhat, name = "Simple Moving Average - 24",
+            line = list(dash = "dash")) %>%
+  add_lines(x = robusta_fc_m36$date, y = robusta_fc_m36$yhat, name = "Simple Moving Average - 36",
+            line = list(dash = "dash")) %>%
+  add_lines(x = robusta_fc_m48$date, y = robusta_fc_m48$yhat, name = "Simple Moving Average - 48",
+            line = list(dash = "dash")) %>%
+  add_lines(x = robusta_fc_m60$date, y = robusta_fc_m60$yhat, name = "Simple Moving Average - 60",
+            line = list(dash = "dash")) %>%
+  layout(title = "Forecasting Robusta Coffee Monthly Prices",
+         xaxis = list(title = ""),
+         yaxis = list(title = "USD / Kg"))
+```
+
+-   The main observations from the preceding plot are as follows:
+
+    -   If the length of the rolling window is shorter:
+
+        -   The range of the forecast is fairly close to the most recent observations of the series
+
+        -   The faster the forecast converges to some constant value
+
+    -   If the window length is longer:
+
+        -   The longer it takes until the forecast converges to some constant value
+
+        -   It can handle better shocks and outliers
+
+    -   An SMA forecasting model with a rolling window of a length of 1 is equivalent to the Naïve forecasting model
+
+## Weighted Moving Average (WMA)
+
+-   The main advantage of the WMA function, with respect to the SMA function, is that it allows you to distribute the weight of the lags on the rolling window. This can be useful when the series has a high correlation with some of its lags.
+
+```{r}
+USgas_df <- ts_to_prophet(USgas)
+
+# The WMA model for applying all the weight on the seasonal lag (lag 12):
+USgas_fc_m12a <- simple_moving_average(USgas_df, horizon = 24, m = 12, weight = c(1, rep(0,11)))
+
+# The WMA model for weighting the first lag with 0.2 and the seasonal lag (lag 12) with 0.8
+USgas_fc_m12b <- simple_moving_average(USgas_df, horizon = 24, m = 12, weight = c(0.8, rep(0,10), 0.2))
+```
+
+```{r}
+plot_ly(data = USgas_df[190:nrow(USgas_df),], x = ~ ds, y = ~ y, type = "scatter",
+        mode = "lines", name = "Actual") %>%
+  add_lines(x = USgas_fc_m12a$date, y = USgas_fc_m12a$yhat, name = "WMA - Seasonal Lag",
+            line = list(dash = "dash")) %>%
+  add_lines(x = USgas_fc_m12b$date, y = USgas_fc_m12b$yhat, 
+            name = "WMA - 12 (0.2/0.8)",
+            line = list(dash = "dash")) %>%
+  layout(title = "Forecasting the Monthly Consumption of Natural Gas in the US",
+         xaxis = list(title = ""),
+         yaxis = list(title = "Billion Cubic Feet"))
+```
+
+-   As you can see in the preceding plot, both models captured the seasonal oscillation of the series to some extent. Setting the full weight on the seasonal lag is equivalent to the seasonal Naïve model. This strategy could be useful for a series with a dominant seasonal pattern, such as USgas. In the second example, we weighted the average between the most recent lag and the seasonal lag. It would make sense to distribute the weights between the different lags when the series has a high correlation with those lags.
+
+-   While WMA can capture the seasonal component of a series, it cannot capture the series trend (due to the average effect). Therefore, this method will start to lose its effectiveness once the forecast horizon crosses the length of the series frequency (for example, more than a year for monthly series). Later on in this chapter, we will introduce the Holt-Winters model, which can handle time series with both seasonal and trend components.
+
+## Forecasting with exponential smoothing
+
+#### Simple exponential smoothing model
+
+#### Forecasting with the ses function
+
+```{r}
+robusta_partition <- ts_split(robusta, sample.out = 12)
+
+train <- robusta_partition$train
+test <- robusta_partition$test
+```
+
+```{r}
+forecast_ses <- ses(train, h = 12, initial = "optimal")
+
+forecast_ses$model
+```
+
+```{r}
+test_forecast(actual = robusta, forecast.obj = forecast_ses, test = test) %>%
+  layout(title = "Robusta Coffee Prices Forecast vs Actual",
+         xaxis = list(range = c(2010, max(time(robusta)))),
+         yaxis = list(range = c(1, 3)))
+```
+
+```{r}
+plot_forecast(forecast_ses) %>%
+  add_lines(x = time(test) + deltat(test), y = as.numeric(test), name = "Testing Partition") %>%
+  layout(title = "Robusta Coffee Prices Forecast vs Actual",
+         xaxis = list(range = c(2010, max(time(robusta)) + deltat(robusta))),
+         yaxis = list(range = c(0, 4)))
+```
+
+#### Model optimization with grid search
+
+```{r}
+robusta_partition2 <- ts_split(robusta, sample.out = 24)
+
+train_one <- robusta_partition2$train
+test_one <- ts_split(robusta_partition2$test, sample.out = 12)$train
+
+robusta_partition3 <- ts_split(robusta, sample.out = 12)
+
+train_two <- robusta_partition3$train
+valid <- robusta_partition3$test
+```
+
+-   The following alpha variable defines the search range. We will assign a sequence of values between 0 and 1 with an increment of 0.01 using the seq function:
+
+```{r}
+alpha <- seq(from = 0, to = 1, by = 0.01)
+
+# Since the value of alpha must be greater than zero, we will replace 0 with a small number
+# that's fairly close to zero
+alpha[1] <- 0.001
+```
+
+```{r}
+ses_grid <- lapply(alpha, function(i) {
+  model1 <- model_accuracy1 <- model2 <- model_accuracy2 <- results <- NULL
+  model1 <- ses(train_one, h = 12, alpha = i, initial = "simple")
+  model_accuracy1 <- accuracy(model1, test_one) 
+  model2 <- ses(train_two, h = 12, alpha = i, initial = "simple")
+  model_accuracy2 <- accuracy(model2, valid)
+  
+  results <- data.frame(alpha = i, train = model_accuracy1[9], test = model_accuracy1[10],
+                        valid = model_accuracy2[10])
+}) %>% bind_rows()
+```
+
+```{r}
+plot_ly(data = ses_grid, x = ~ alpha, y = ~ train, line = list(color = 'rgb(205, 12, 24)'),
+        type = "scatter", mode = "lines", name = "Training") %>%
+  add_lines(x = ~alpha, y = ~test, line = list(color = "rgb(22, 96, 167)", dash = "dash"), 
+            name = "Testing") %>%
+  add_lines(x = ~ alpha, y = ~ valid, line = list(color = "green", dash = "dot"), name = "Validation") %>%
+  layout(title = "SES Model Grid Search Results",
+         yaxis = list(title = "MAPE (%)"))
+```
+
+#### Holt Method
+
+#### Forecasting with the holt function
+
 ```{r}
 
 ```
