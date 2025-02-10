@@ -320,6 +320,17 @@ head(macro_monthly)
 ```
 
 ```{r}
+library(readxl)
+
+macro_monthly <- read_excel("~/Work/Data Science/Learning/Datasets/macro-monthly/macro_monthly.xlsx")
+
+macro_monthly <- as.data.frame(macro_monthly)
+# View(macro_monthly)
+
+head(macro_monthly)
+```
+
+```{r}
 names(macro_monthly)
 ```
 
@@ -330,7 +341,7 @@ head(gdp)
 ```
 
 ```{r}
-dim(gdp)
+str(gdp)
 ```
 
 ```{r}
@@ -344,23 +355,45 @@ gdp_ts <- ts(gdp$dspic, start = gdp$DATE, frequency = 12)
 ```
 
 ```{r}
-ts_plot(gdp_ts,
+ts_plot(gdp,
         title = "US Gross Domestic Product",
         Ytitle = "Billions of Dollars",
         Xtitle = "Source: U.S. Bureau of Economic Analysis / fred.stlouisfed.org")
 ```
 
 ```{r}
-gdp_partition <- ts_split(gdp, sample.out = 8)
+gdp_partition <- ts_split(gdp_ts, sample.out = 8)
 
 train <- gdp_partition$train
 test <- gdp_partition$test
+```
 
+```{r}
 forecast_holt <- holt(train, h = 8, initial = "optimal")
 
 forecast_holt$model
 ```
 
 ```{r}
-str(gdp)
+accuracy(forecast_holt, test)
 ```
+
+```{r}
+test_forecast(train, forecast.obj = forecast_holt, test = test)
+```
+
+```{r}
+forecast_holt_exp <- holt(train, h = 8, beta = 0.75, initial = "optimal", exponential = TRUE)
+
+forecast_holt_exp$model
+```
+
+```{r}
+accuracy(forecast_holt_exp, test)
+```
+
+```{r}
+test_forecast(gdp, forecast.obj = forecast_holt_exp, test = test)
+```
+
+#### Holt-Winters Model
