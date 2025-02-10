@@ -275,5 +275,92 @@ plot_ly(data = ses_grid, x = ~ alpha, y = ~ train, line = list(color = 'rgb(205,
 #### Forecasting with the holt function
 
 ```{r}
+gdp = Quandl("FRED/GDP", start_date = "2010-01-01", type = "ts")
 
+ts_info(gdp)
+```
+
+```{r}
+library(tidyquant)
+
+gdp <- tq_get("GDP", get = "economic.data")
+
+head(gdp)
+```
+
+```{r}
+library(wbstats)
+
+gdp <- wb_data(indicator = "NY.GDP.MKTP.CD", country = "USA")
+
+head(gdp)
+```
+
+```{r}
+names(gdp)
+```
+
+```{r}
+gdp <- gdp[c("date", "price")]
+
+head(gdp)
+```
+
+```{r}
+dim(gdp)
+```
+
+```{r}
+library(readr)
+
+macro_monthly <- read_csv("~/Work/Data Science/Learning/Datasets/macro-monthly/macro_monthly.csv")
+#View(macro_monthly)
+
+head(macro_monthly)
+```
+
+```{r}
+names(macro_monthly)
+```
+
+```{r}
+gdp <- macro_monthly[c("DATE", "dspic")]
+
+head(gdp)
+```
+
+```{r}
+dim(gdp)
+```
+
+```{r}
+library(xts)
+
+gdp_xts <- xts(gdp$dspic, order.by = as.Date(gdp$DATE))
+```
+
+```{r}
+gdp_ts <- ts(gdp$dspic, start = gdp$DATE, frequency = 12)
+```
+
+```{r}
+ts_plot(gdp_ts,
+        title = "US Gross Domestic Product",
+        Ytitle = "Billions of Dollars",
+        Xtitle = "Source: U.S. Bureau of Economic Analysis / fred.stlouisfed.org")
+```
+
+```{r}
+gdp_partition <- ts_split(gdp, sample.out = 8)
+
+train <- gdp_partition$train
+test <- gdp_partition$test
+
+forecast_holt <- holt(train, h = 8, initial = "optimal")
+
+forecast_holt$model
+```
+
+```{r}
+str(gdp)
 ```
