@@ -1,8 +1,48 @@
 ```{r}
-library(tidyverse)
 library(forecast)
-library(TSstudio)
+library(tidyverse)
 library(plotly)
-library(h2o)
+library(TSstudio)
 library(Quandl)
+library(h2o)
+```
+
+```{r}
+data("Coffee_Prices")
+
+ts_info(Coffee_Prices)
+```
+
+```{r}
+head(Coffee_Prices)
+```
+
+```{r}
+ts_plot(Coffee_Prices,
+        title = "Robusta and Arabica Coffee Monthly Prices",
+        Xtitle = "Year",
+        Ytitle = "Price in USD")
+```
+
+```{r}
+robusta <- Coffee_Prices[,1]
+arabica <- Coffee_Prices[,2]
+```
+
+```{r}
+ts_plot(robusta,
+        title = "The Robusta Coffee Monthly Prices",
+        Ytitle = "Price in USD",
+        Xtitle = "Year")
+```
+
+```{r}
+ts_plot(arabica,
+        title = "The Robusta Coffee Monthly Prices",
+        Ytitle = "Price in USD",
+        Xtitle = "Year")
+```
+
+```{r}
+
 ```
