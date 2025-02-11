@@ -7,3 +7,374 @@ library(stats)
 library(base)
 library(datasets)
 ```
+
+-   We will cover the following topics:
+
+    -   The stationary state of time series data
+
+    -   The random walk process
+
+    -   The AR and MA processes
+
+    -   The ARMA and ARIMA models
+
+    -   The seasonal ARIMA model
+
+    -   Linear regression with the ARIMA errors model
+
+## The Stationary Process
+
+-   Time series data is stationary if the following conditions are taking place:
+
+    -   The mean and variance of the series do not change over time .
+
+    -   The correlation structure of the series, along with its lags, remains the same over time.
+
+```{r}
+set.seed(40)
+
+stationary_ts <- arima.sim(model = list(order = c(1,0,0), ar = 0.5), n = 500)
+```
+
+```{r}
+ts_plot(stationary_ts)
+```
+
+```{r}
+non_stationary_ts <- arima.sim(model = list(order = c(1,1,0), ar = 0.3), n = 500)
+
+ts_plot(non_stationary_ts,
+        title = "Non-Stationary Time Series",
+        Ytitle = "Value",
+        Xtitle = "Index")
+```
+
+```{r}
+ts_plot(AirPassengers,
+        title = "Monthly Airline Passenger Numbers 1949-1960",
+        Ytitle = "Thousands of Passengers",
+        Xtitle = "Year")
+```
+
+## [Transforming a non-stationary series into a stationary series]{.underline}
+
+#### Differencing Time Series
+
+```{r}
+ts_plot(diff(AirPassengers, lag = 1),
+        title = "AirPassengers Series - First Differencing",
+        Xtitle = "Year",
+        Ytitle = "Differencing of Thousands of Passengers")
+```
+
+-   You can see that the first difference of the AirPassenger series removed the series trend and that the mean of the series is, overall, constant over time. On the other hand, there is clear evidence that the variation of the series is increasing over time, and therefore the series is not stationary yet. In addition to the first order difference, taking the seasonal difference of the series could solve this issue. Let's add the seasonal difference to the first order difference and plot it again:
+
+```{r}
+ts_plot(diff(diff(AirPassengers, lag = 1), 12),
+        title = "AirPassengers Series - First and Seasonal Differencing",
+        Xtitle = "Year",
+        Ytitle = "Differencing of Thousands of Passengers")
+```
+
+#### Log Transformation
+
+```{r}
+ts_plot(diff(log(AirPassengers), lag = 1),
+              title = "AirPassengers Series - First Differencing with Log
+              Transformation",
+              Xtitle = "Year",
+              Ytitle = "Differencing/Log of Thousands of Passengers")
+```
+
+#### The random walk process
+
+```{r}
+p1 <- plot_ly()
+p2 <- plot_ly()
+
+for(i in 1:20){
+  rm <- NULL
+  rw <- arima.sim(model = list(order = c(0, 1, 0)), n = 500)
+  p1 <- p1 %>% add_lines(x = time(rw), y = as.numeric(rw))
+  p2 <- p2 %>% add_lines(x = time(diff(rw)), y = as.numeric(diff(rw)))
+}
+```
+
+```{r}
+p1 %>% layout(title = "Simulate Random Walk",
+  yaxis = list(title = "Value"),
+  xaxis = list(title = "Index")
+) %>% hide_legend()
+```
+
+```{r}
+p2 %>% layout(title = "Simulate Random Walk with First-Order Differencing",
+  yaxis = list(title = "Value"),
+  xaxis = list(title = "Index")
+) %>% hide_legend()
+```
+
+## The AR Process
+
+```{r}
+arima_simulation <- arima.sim(model = list(order = c(2,0,0), 
+                                           ar = c(0.9, -0.3)), 
+                              n =500)
+
+ts_plot(arima_simulation, title = "Simulate AR(2) Series", Xtitle = "Index", Ytitle = "Values")
+```
+
+-   The ar function from the stats package allows us to fit an AR model on time series data and than forecast its future values. This function identifies the AR order automatically based on the Akaike Information Criterion (AIC). The method argument allows you to define the coefficients estimation method, such as the ordinary least squares (OLS) (which we saw in Chapter 9, Forecasting with Linear Regression), maximum likelihood estimation (MLE), and Yule-Walker (default). Let's apply the ar function to identify the AR order and estimate its coefficients accordingly
+
+```{r}
+model_ar <- ar(arima_simulation)
+
+model_ar
+```
+
+## Identifying the AR process and its characteristics
+
+-   Utilizing the autocorrelation function (ACF) and partial autocorrelation function (PACF), which we introduced in Chapter 7, Correlation Analysis, allows us to classify the process type and identify its order. If the ACF output tails off and the PACF output cuts off at lag p, this indicates that the series is an AR(p) process. Let's calculate and plot the ACF and PACF for the simulated AR(2) series we created previously with the ACF and PACF functions. First, we will use the par function to plot the two plots side by side by setting the mfrow argument to c(1,2) (one row, two columns
+
+```{r}
+par(mfrow=c(1,2))
+
+acf(arima_simulation)
+pacf(arima_simulation)
+```
+
+-   In the case of the ar2 series, you can see that the ACF plot is tailing off and that the PACF plot is cut off at the second lag. Therefore, we can conclude that the series has a second order AR process.
+
+### The Moving Average Process
+
+```{r}
+arima_simulation2 <- arima.sim(model = list(order = c(0,0,2), ma = c(.5, -0.3)), n = 500)
+
+ts_plot(arima_simulation2, title = "Simulate MA(2) Series", Xtitle = "Index", Ytitle = "Values")
+```
+
+```{r}
+model_ma <- arima(arima_simulation2, order = c(0,0,2), method = "ML")
+
+model_ma
+```
+
+```{r}
+par(mfrow=c(1,2))
+
+acf(arima_simulation2)
+pacf(arima_simulation2)
+```
+
+-   In the case of the ma2 series, the ACF plot is cut off on the second lag (note that lag 0 is the correlation of the series with itself, and therefore it is equal to 1 and we can ignore it), and so the PACF tails off. Therefore, we can conclude that the ma2 series is an MA(2) process.
+
+## The ARMA Model
+
+```{r}
+arma <- arima.sim(model = list(order = c(1,0,2),
+                                ar = c(0.7),
+                                ma = c(0.5, -0.3)),
+                  n = 500)
+
+ts_plot(arma)
+```
+
+-   Fitting an ARMA model is straightforward with the arima function. In this case, we have to set the p and q parameters on the order argument.
+
+```{r}
+arma_model <- arima(arma, order = c(1, 0, 2))
+
+arma_model
+```
+
+```{r}
+summary(arma_model)
+```
+
+```{r}
+par(mfrow=c(1,2))
+
+acf(arma)
+pacf(arma)
+```
+
+### Manual tuning of the ARMA model
+
+-   Manually tuning the ARMA model is mainly based on experimentation, intuition, common sense, and experience. The tuning process is based on the following steps:
+
+    1.  Set some initial values for p and q. Typically, it is recommended to start with the minimum values of p and q (for example, p = 1 and q = 1).
+
+    2.  Evaluate the fit of the model based on some error criterion. The most common error criteria are the Akaike Information Criterion (AIC) or Bayesian information criterion (BIC).
+
+    3.  Adjust the values of either p and q.
+
+    4.  Evaluate the change in the error metric.
+
+    5.  Repeat the last two steps until you cannot achieve additional improvements of the error metric.
+
+```{r}
+arima(arma, order = c(1, 0, 1), include.mean = FALSE)
+```
+
+```{r}
+arima(arma, order = c(2, 0, 1), include.mean = FALSE)
+```
+
+```{r}
+arima(arma, order = c(1, 0, 2), include.mean = FALSE)
+```
+
+```{r}
+arima(arma, order = c(2, 0, 2), include.mean = FALSE)
+```
+
+```{r}
+checkresiduals(arima(arma, order = c(1, 0, 2), include.mean = FALSE))
+```
+
+-   The checkresiduals function also returns the Ljung-Box test results, which suggests that the residuals are white noise:
+
+## Forecasting AR, MA, and ARMA models
+
+```{r}
+arma_forecast <- forecast(model_ar, h = 100)
+
+arma_forecast
+```
+
+```{r}
+plot_forecast(arma_forecast, title = "Forecast of AR(2) Series Model",
+              Ytitle = "Values", Xtitle = "Year")
+```
+
+## The ARIMA Model
+
+-   Identifying and setting the ARIMA model is a two-step process and is based on the following steps:
+
+    1.  Identify the degree of differencing that is required to transfer the series into a stationary state
+
+    2.  Identify the ARMA process (or AR and MA processes), as introduced in the previous section
+
+#### Identifying the model degree of differencing
+
+```{r}
+head(Coffee_Prices)
+```
+
+```{r}
+robusta <- window(Coffee_Prices[,1], start = c(2000, 1))
+
+ts_plot(robusta, title = "Robusta Coffee Monthly Prices",
+        Ytitle = "Prices in USD", Xtitle = "Year")
+```
+
+```{r}
+acf(robusta)
+```
+
+-   As you can see in the preceding output of the ACF plot, the correlation of the series with its lags is slowly decaying over time in a linear manner. Removing both the series trend and correlation between the series and its lags can be done by differencing the series. We will start with the first differencing using the diff function
+
+```{r}
+robusta_diff1 <- diff(robusta)
+
+par(mfrow=c(1,2))
+
+acf(robusta_diff1)
+pacf(robusta_diff1)
+```
+
+```{r}
+robusta_model <- arima(robusta, order = c(1,1,0))
+
+summary(robusta_model)
+```
+
+-   You can see from the model summary output that the ar1 coefficient is statistically significant. Last but not least, we will check the model residuals
+
+```{r}
+checkresiduals(robusta_model)
+```
+
+-   The Ljung-Box test suggested that the residuals are white noise.
+
+-   Overall, the plot of the model's residuals and the Ljung-Box test indicate that the residuals are white noise. The ACF plot indicates that there are some correlated lags, but they are only on the border of being significant and so we can ignore them
+
+## The Seasonal ARIMA Model
+
+### Tuning the SARIMA model
+
+#### Tuning the non-seasonal parameters
+
+-   Applying the same logic that we used with the ARIMA model, tuning the non-seasonal parameters of the SARIMA model is based on the ACF and PACF plots:
+
+    1.  An AR(p) process should be used if the non-seasonal lags of the ACF plot are tailing off, while the corresponding lags of the PACF plots are cutting off on the p lag
+
+    2.  Similarly, an MA(q) process should be used if the non-seasonal lags of the ACF plot are cutting off on the q lag and the corresponding lags of the PACF plots are tailing off
+
+    3.  When both the ACF and PACF non-seasonal lags are tailing off, an ARMA model should be used
+
+    4.  Differencing the series with the non-seasonal lags should be applied when the non-seasonal lags of the ACF plot are decaying in a linear manner
+
+#### Tuning the seasonal parameters
+
+-   Tuning the seasonal parameters of the SARIMA model with ACF and PACF follows the same guidelines as the ones we used for selecting the ARIMA parameters:
+
+    1.  We will use a seasonal autoregressive process with an order of P, or SAR(P), if the seasonal lags of the ACF plot are tailing off and the seasonal lags of the PACF plot are cutting off by the P seasonal lag
+
+    2.  Similarly, we will apply a seasonal moving average process with an order of Q, or SMA(Q), if the seasonal lags of the ACF plot are cutting off by the Q seasonal lag and the seasonal lags of the PACF plot are tailing off
+
+    3.  An ARMA model should be used whenever the seasonal lags of both the ACF and PACF plots are tailing off
+
+    4.  Seasonal differencing should be applied if the correlation of the seasonal lags are decaying in a linear manner
+
+### Forecasting US monthly natural gas consumption with the SARIMA model
+
+```{r}
+ts_plot(USgas, title = "US Monthly Natural Gas Consumption",
+        Ytitle = "Billion Cubic Feet",
+        Xtitle = "Year")
+```
+
+```{r}
+USgas_split <- ts_split(USgas, sample.out = 12)
+
+train <- USgas_split$train
+test <- USgas_split$test
+```
+
+-   Before we start the training process of the SARIMA model, we will conduct diagnostics in regards to the series correlation with the ACF and PACF functions. Since we are interested in viewing the relationship of the series with its seasonal lags, we will increase the number of lags to calculate and display by setting the lag.max argument to 60 lags:
+
+```{r}
+par(mfrow=c(1,2))
+
+acf(train, lag.max = 60)
+pacf(train, lag.max = 60)
+```
+
+-   The preceding ACF plot indicates that the series has a strong correlation with both the seasonal and non-seasonal lags. Furthermore, the linear decay of the seasonal lags indicates that the series is not stationary and that seasonal differencing is required. We will start with a seasonal differencing of the series and plot the output to identify whether the series is in a stationary state:
+
+```{r}
+USgas_diff12 <- diff(train, 12)
+
+ts_plot(USgas_diff12, title = "US Monthly Natural Gas consumption - First Seasonal Difference",
+        Ytitle = "Billion Cubic Feet (First Difference)",
+        Xtitle = "Year")
+```
+
+-   While we removed the series trend, the variation of the series is not stable yet. Therefore, we will also try to take the first difference of the series
+
+```{r}
+USgas_diff12_1 <- diff(diff(USgas_d12, 1))
+
+ts_plot(USgas_diff12_1, 
+        title = "US Monthly Natural Gas consumption - First Seasonal and Non-Seasonal Differencing",
+        Ytitle = "Billion Cubic Feet (Difference)",
+        Xtitle = "Year")
+```
+
+```{r}
+par(mfrow=c(1,2))
+
+acf(USgas_diff12_1, lag.max = 60)
+pacf(USgas_diff12_1, lag.max = 60)
+```
