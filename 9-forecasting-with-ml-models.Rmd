@@ -166,6 +166,15 @@ mape_lr
 ### Starting a h2o cluster
 
 ```{r}
+# h2o.ls()  # List objects in H2O cluster
+# h2o.removeAll()  # Free up memory before rerunning
+
+h2o.shutdown(prompt = FALSE)  # Shutdown existing H2O instance
+Sys.sleep(5)  # Wait a few seconds
+h2o.init(max_mem_size = "4G")  # Start H2O with 4GB RAM
+```
+
+```{r}
 h2o.init()
 ```
 
@@ -269,6 +278,10 @@ search_criteria_rf <- list(strategy = "RandomDiscrete",
 ```
 
 ```{r}
+h2o.describe(train_h)  # Check for missing values
+```
+
+```{r}
 rf2 <- h2o.grid(algorithm = "randomForest",
                 search_criteria = search_criteria_rf,
                 hyper_params = hyper_params_rf,
@@ -299,6 +312,10 @@ test_h$rf_grid <- h2o.predict(rf_grid_model, test_h)
 
 mape_rf2 <- mean(abs(test_1$y - test_1$rf_grid) / test_1$y)
 mape_rf2
+```
+
+```{r}
+test_1 <- as.data.frame(test_h)
 ```
 
 ```{r}
