@@ -1,0 +1,54 @@
+---
+title: "project"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(h2o)
+library(TSstudio)
+library(plotly)
+library(zoo)
+library(xts)
+library(Quandl)
+library(forecast)
+library(readr)
+library(naniar)
+```
+
+```{r}
+macro_monthly <- read_csv("~/Work/Data Science/Learning/Datasets/macro-monthly/macro_monthly.csv")
+head(macro_monthly)
+```
+
+```{r}
+names(macro_monthly)
+```
+
+```{r}
+macro_monthly <- macro_monthly %>%
+  # mutate(across(where(is.double), as.integer))
+  mutate(across(-1, as.numeric))  # Excludes the first column
+
+head(macro_monthly)
+```
+
+```{r}
+str(macro_monthly)
+```
+
+```{r}
+ts_plot(macro_monthly)
+```
+
+```{r}
+colSums(is.na(macro_monthly))
+```
+
+```{r}
+vis_miss(macro_monthly)
+```
+
+```{r}
+
+```
