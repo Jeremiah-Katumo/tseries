@@ -1,0 +1,420 @@
+```{r}
+library(tidyverse)
+library(h2o)
+library(TSstudio)
+library(plotly)
+```
+
+```{r}
+
+```
+
+## Forecasting monthly vehicle sales in the USA
+
+### Exploratory analysis of the USVSales series
+
+-   The exploratory analysis of the USVSales series will focus on the following topics:
+
+    -   View the time series structure (frequency, start and end of the series, and so on)
+
+    -   Explore the series components (seasonal, cycle, trend, and random components)
+
+    -   Seasonality analysis
+
+    -   Correlation analysis
+
+#### The Series Structure
+
+```{r}
+ts_info(USVSales)
+```
+
+```{r}
+ts_plot(USVSales, 
+        title = "US Total Monthly Vehicle Sales",
+        Ytitle = "Thousands of Units",
+        Xtitle = "Year")
+```
+
+#### The Series Components
+
+```{r}
+ts_decompose(USVSales)
+```
+
+#### Seasonal Analysis
+
+```{r}
+USVSales_detrend <- USVSales - decompose(USVSales)$trend
+
+ts_seasonal(USVSales_detrend, type = "box")
+```
+
+-   We can see from the preceding seasonal plot that, typically, the peak of the year occurred during the months of March, May, and June. In addition, you can see that the sales decay from the summer months and peak again in December during the holiday seasons. On the other hand, the month of January is typically the lowest month of the year in terms of sales.
+
+#### Correlation Analysis
+
+```{r}
+ts_cor(USVSales, type = "both")       # you can change type to acf, pacf or both
+```
+
+-   We can see from the preceding seasonal plot that, typically, the peak of the year occurred during the months of March, May, and June. In addition, you can see that the sales decay from the summer months and peak again in December during the holiday seasons. On the other hand, the month of January is typically the lowest month of the year in terms of sales.
+
+```{r}
+ts_lags(USVSales, lags = c(12, 24, 36))
+```
+
+#### Exploratory analysis – key findings
+
+-   We can conclude our short exploratory analysis of the USVSales series with the following observations:
+
+    -   The USVSales series is a monthly series with a clear monthly seasonality
+
+    -   The series trend has a cyclic shape, and so the series has a cycle component embedded in the trend
+
+    -   The series' most recent cycle starts right after the end of the 2008 economic crisis, between 2009 and 2010
+
+    -   It seems that the current cycle reached its peak as the trend starts to flatten out
+
+    -   The series has a strong correlation with its first seasonal lag
+
+```{r}
+df <- ts_to_prophet(window(USVSales, start = c(2010,1)))
+
+names(df) <- c("date", "y")
+
+head(df)
+```
+
+```{r}
+ts_plot(df,
+        title = "US Total Monthly Vehicle Sales (Subset)",
+        Ytitle = "Thousands of Units",
+        Xtitle = "Year")
+```
+
+### Feature Engineering
+
+-   In the context of time series forecasting, here are some examples of possible new features that can be created from the series itself:
+
+    -   **The series trend**: This uses a numeric index. In addition, as the series trend isn't linear, we will use a second polynomial of the index to capture the overall curvature of the series trend.
+
+    -   **Seasonal component**: This creates a categorical variable for the month of the year to capture the series' seasonality.
+
+    -   **Series correlation**: This utilizes the strong correlation of the series with its seasonal lag and uses the seasonal lag (lag12) as an input to the model.
+
+```{r}
+library(h2o)
+
+df <- df %>% mutate(month = factor(lubridate::month(date), ordered = FALSE), 
+                    lag12 = lag(y, n = 12)
+                    ) %>% dplyr::filter(!is.na(lag12))
+
+head(df)
+```
+
+```{r}
+names(df)
+```
+
+```{r}
+# We will then add the trend component and its second polynomial (trend squared):
+df$trend <- 1:nrow(df)
+
+df$trend_sqr <- df$trend ^ 2
+
+str(df)
+```
+
+### Training, testing, and model evaluation
+
+```{r}
+h <- 12
+train_df <- df[1:(nrow(df) - h), ]
+test_df <- df[(nrow(df) - h + 1):nrow(df), ]
+```
+
+```{r}
+forecast_df <- data.frame(date = seq.Date(from = max(df$date) + lubridate::month(1), length.out = h, by = "month"), 
+                          trend = seq(from = max(df$trend) + 1, length.out = h, by = 1))
+
+forecast_df$trend_sqr <- forecast_df$trend ^ 2
+
+forecast_df$month <- factor(lubridate::month(forecast_df$date, label = TRUE), ordered = FALSE)
+
+forecast_df$lag12 <- tail(df$y, 12)
+```
+
+### Model Benchmark
+
+```{r}
+lr <- lm(y ~ month + lag12 + trend + trend_sqr, data = train_df)
+
+summary(lr)
+```
+
+```{r}
+test_df$yhat <- predict(lr, newdata = test_df)
+```
+
+```{r}
+mape_lr <- mean(abs(test_df$y - test_df$yhat) / test_df$y)
+
+mape_lr
+```
+
+### Starting a h2o cluster
+
+```{r}
+h2o.init()
+```
+
+```{r}
+train_h <- as.h2o(train_df)
+
+test_h <- as.h2o(test_df)
+```
+
+```{r}
+forecast_h <- as.h2o(forecast_df)
+```
+
+```{r}
+# For our convenience, we will label the names of the dependent and independent variables:
+x <- c("month", "lag12", "trend", "trend_sqr")
+
+y <- "y"
+```
+
+### Forecasting with the Random Forest Model
+
+```{r}
+rf_md <- h2o.randomForest(training_frame = train_h,
+                          nfolds = 5,
+                          x = x,
+                          y = y,
+                          ntrees = 500,
+                          stopping_rounds = 10,
+                          stopping_metric = "RMSE",
+                          score_each_iteration = TRUE,
+                          stopping_tolerance = 0.0001,
+                          seed = 1234)
+```
+
+```{r}
+rf_md
+```
+
+```{r}
+h2o.varimp_plot(rf_md)
+```
+
+```{r}
+rf_md@model$model_summary
+```
+
+-   We can see that we utilized only 42 trees out of the 500 that were set by the ntrees argument. This is as a result of the stopping parameters that were used on the model. The following plot demonstrates the learning process of the model as a function of the number of trees:
+
+```{r}
+tree_score <- rf_md@model$scoring_history$training_rmse
+
+tree_score
+```
+
+```{r}
+plot_ly(x = seq_along(tree_score), y = tree_score,
+        type = "scatter", mode = "line") %>%
+  layout(title = "The Trained Model Score History",
+         yaxis = list(title = "RMSE"),
+         xaxis = list(title = "Num. of Trees"))
+```
+
+```{r}
+test_h$pred_rf <- h2o.predict(rf_md, test_h)
+
+# Next, we will transfer the h2o data frame to a data.frame object with the as.data.frame function:
+test_1 <- as.data.frame(test_h)
+
+# Now, we can calculate the MAPE score of the RF model on the test partition:
+mape_rf <- mean(abs(test_1$y - test_1$pred_rf) / test_1$y)
+mape_rf
+```
+
+```{r}
+hyper_params_rf <- list(mtries = c(2, 3, 4),
+                        sample_rate = c(0.632, 0.8, 0.95),
+                        col_sample_rate_per_tree = c(0.5, 0.9, 1.0),
+                        max_depth = c(seq(1, 30, 3)),
+                        min_rows = c(1, 2, 5, 10))
+```
+
+-   Here, the parameters we selected are as follows:
+
+    -   **mtries**: Defines the columns to randomly select on each node of the tree
+
+    -   **sample_rate**: Sets the row sampling for each tree
+
+    -   **col_sample_rate_per_tree**: Defines the column sample rate per tree
+
+    -   **max_depth**: Specifies the maximum tree depth
+
+    -   **min_rows**: Sets the minimum number of observations for a leaf
+
+```{r}
+search_criteria_rf <- list(strategy = "RandomDiscrete",
+                           stopping_metric = "rmse",
+                           stopping_tolerance = 0.0001,
+                           stopping_rounds = 10,
+                           max_runtime_secs = 60 * 20)
+```
+
+```{r}
+rf2 <- h2o.grid(algorithm = "randomForest",
+                search_criteria = search_criteria_rf,
+                hyper_params = hyper_params_rf,
+                x = x,
+                y = y,
+                training_frame = train_h,
+                ntrees = 5000,
+                nfolds = 5,
+                grid_id = "rf_grid",
+                seed = 1234)
+```
+
+```{r}
+summary(rf2, show_stack_traces = TRUE)
+```
+
+-   We will now extract the grid results, sort the models by their RMSE score, and pull the lead model:
+
+```{r}
+rf2_grid_search <- h2o.getGrid(grid_id = "rf_grid", sort_by = "rmse", decreasing = FALSE) 
+
+rf_grid_model <- h2o.getModel(rf2_grid_search@model_ids[[1]])
+```
+
+```{r}
+# Test the model in the testing partition and evaluate its performance
+test_h$rf_grid <- h2o.predict(rf_grid_model, test_h)
+
+mape_rf2 <- mean(abs(test_1$y - test_1$rf_grid) / test_1$y)
+mape_rf2
+```
+
+```{r}
+plot_ly(data = test_1) %>%
+  add_lines(x = ~ date, y = ~y, name = "Actual") %>%
+  add_lines(x = ~ date, y = ~ yhat, name = "Linear Regression", line = list(dash = "dot")) %>%
+  add_lines(x = ~ date, y = ~ pred_rf, name = "Random Forest", line = list(dash = "dash")) %>%
+  add_lines(x = ~ date, y = ~ rf_grid, name = "Random Forest (grid)", line = list(dash = "dash")) %>%
+  layout(title = "Total Vehicle Sales - Actual vs. Prediction (Random Forest)",
+         yaxis = list(title = "Thousands of Units"),
+         xaxis = list(title = "Month"))
+```
+
+### Forecasting with the GBM model
+
+```{r}
+gbm_md <- h2o.gbm(training_frame = train_h,
+                  nfolds = 5,
+                  x = x,
+                  y = y,
+                  max_depth = 20,
+                  distribution = "gaussian",
+                  ntrees = 500,
+                  learn_rate = 0.1,
+                  score_each_iteration = TRUE)
+```
+
+```{r}
+gbm_md
+```
+
+```{r}
+h2o.varimp_plot(gbm_md)
+```
+
+-   For RF, the GBM model ranks the lag12 variable as the modt important to the model. Let us test the model's performance
+
+```{r}
+test_h$pred_gbm <- h2o.predict(gbm_md, test_h)
+
+test_1 <- as.data.frame(test_h)
+
+mape_gbm <- mean(abs(test_1$y - test_1$pred_gbm) / test_1$y)
+mape_gbm
+```
+
+```{r}
+plot_ly(data = test_1) %>%
+  add_lines(x = ~ date, y = ~y, name = "Actual") %>%
+  add_lines(x = ~ date, y = ~ yhat, name = "Linear Regression", line = list(dash = "dot")) %>%
+  add_lines(x = ~ date, y = ~ pred_gbm, name = "Gradient Boosting Machine", line = list(dash = "dash")) %>%
+  layout(title = "Total Vehicle Sales - Actual vs. Prediction (Gradient Boosting Machine)",
+         yaxis = list(title = "Thousands of Units"),
+         xaxis = list(title = "Month"))
+```
+
+### Forecasting with the AutoML model
+
+```{r}
+autoML1 <- h2o.automl(training_frame = train_h,
+                      x = x,
+                      y = y,
+                      nfolds = 5,
+                      max_runtime_secs = 60*20,
+                      seed = 1234)
+```
+
+```{r}
+autoML1
+```
+
+```{r}
+autoML1@leaderboard
+```
+
+```{r}
+test_h$pred_autoML <- h2o.predict(autoML1@leader, test_h)
+
+test_1 <- as.data.frame(test_h)
+
+mape_autoML <- mean(abs(test_1$y - test_1$pred_autoML) / test_1$y)
+mape_autoML
+```
+
+```{r}
+plot_ly(data = test_1) %>%
+  add_lines(x = ~ date, y = ~y, name = "Actual") %>%
+  add_lines(x = ~ date, y = ~ yhat, name = "Linear Regression", line = list(dash = "dot")) %>%
+  add_lines(x = ~ date, y = ~ pred_autoML, name = "autoML", line = list(dash = "dash")) %>%
+  layout(title = "Total Vehicle Sales - Actual vs. Prediction (Auto ML Model)",
+         yaxis = list(title = "Thousands of Units"),
+         xaxis = list(title = "Month"))
+```
+
+### Selecting the final model
+
+```{r}
+forecast_h$pred_gbm <- h2o.predict(gbm_md, forecast_h)
+forecast_h$pred_rf <- h2o.predict(rf_grid_model, forecast_h)
+forecast_h$pred_automl <- h2o.predict(autoML1@leader, forecast_h)
+```
+
+```{r}
+# Transform back the object into a dataframe object
+final_forecast <- as.data.frame(forecast_h)
+```
+
+```{r}
+plot_ly(x = df$date, y = df$y, type = "scatter", mode = "line", name = "Actual") %>%
+  add_lines(x = final_forecast$date, y = final_forecast$pred_rf, name = "Random Forest") %>%
+  add_lines(x = final_forecast$date, y = final_forecast$pred_gbm, name = "GBM") %>%
+  add_lines(x = final_forecast$date, y = final_forecast$pred_automl, name = "Auto ML") %>%
+  layout(title = "Total Vehicle Sales - Final Forecast",
+         yaxis = list(title = "Thousands of Units", range = c(1100, 1750)),
+         xaxis = list(title = "Month", range = c(as.Date("2016-01-01"),
+                                                 as.Date("2020-01-01"))))
+```
+
+-   It seems that all three models capture the seasonality component of the vehicle sales series. However, it seems that the oscillation of AutoML is higher with respect to one of the RF and GBM models. Therefore, it would make sense to select either the GBM or RF models as the final forecast. A more conservative approach would be to create and ensemble the three forecasts by either weighted on regular average. For instance, you can use a simple function for testing the different average of different models and select the combination that minimizes the forecast error rate on the testing set.
