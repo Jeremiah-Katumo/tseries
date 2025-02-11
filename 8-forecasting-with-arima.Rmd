@@ -364,7 +364,7 @@ ts_plot(USgas_diff12, title = "US Monthly Natural Gas consumption - First Season
 -   While we removed the series trend, the variation of the series is not stable yet. Therefore, we will also try to take the first difference of the series
 
 ```{r}
-USgas_diff12_1 <- diff(diff(USgas_d12, 1))
+USgas_diff12_1 <- diff(diff(USgas_diff12, 1))
 
 ts_plot(USgas_diff12_1, 
         title = "US Monthly Natural Gas consumption - First Seasonal and Non-Seasonal Differencing",
@@ -377,4 +377,187 @@ par(mfrow=c(1,2))
 
 acf(USgas_diff12_1, lag.max = 60)
 pacf(USgas_diff12_1, lag.max = 60)
+```
+
+-   The tuning process of the SARIMA model parameters follow the same steps that we applied previously with the ARMA model:
+
+    1.  We set the model maximum order (that is, the sum of the six parameters of the model)
+
+    2.  We set a range of a possible combination of the parameters' values under the model's maximum order constraint
+
+    3.  We test and score each model, that is, a typical score methodology with the AIC (which we used previously) or BIC
+
+    4.  We select a set of parameter combinations that give the best results
+
+```{r}
+p <- q <- P <- Q <- 0:2
+```
+
+```{r}
+arima_grid <- expand.grid(p, q, P, Q)
+
+arima_grid
+```
+
+```{r}
+names(arima_grid) <- c("p", "q", "P", "Q")
+
+arima_grid$d <- 1
+arima_grid$D <- 1
+```
+
+```{r}
+arima_grid$k <- rowSums(arima_grid)
+```
+
+```{r}
+arima_grid <- arima_grid %>% filter(k <= 7)
+
+arima_grid
+```
+
+-   Now that the grid search table is ready, we can start the search process. We will use the lapply function to iterate over the grid search table. This function will train the SARIMA model and score its AIC for each set of parameters in the grid search table. The arima function can train the SARIMA model by setting the seasonal argument of the model with the values of P, D, and Q
+
+```{r}
+arima_search <- lapply(1:nrow(arima_grid), function(i){
+    mdl <- NULL
+    mdl <- arima(train, 
+                order = c(arima_grid$p[i], 1, arima_grid$q[i]), 
+                seasonal = list(order = c(arima_grid$P[i], 1, arima_grid$Q[i])))
+    
+    results <- data.frame(p = arima_grid$p[i], 
+                          d = 1, 
+                          q = arima_grid$q[i], 
+                          P = arima_grid$P[i], 
+                          D = 1, 
+                          Q = arima_grid$Q[i], 
+                          AIC = mdl$aic
+                          )
+ }) %>% bind_rows() %>% arrange(AIC)
+
+head(arima_search)
+```
+
+-   The leading model based on the preceding search table is the ![](images/sarima.png){width="200" height="21"} model. Before we finalize the forecast, let's evaluate the selected model's performance on the testing set. We will retrain the model using the settings of the selected model:
+
+```{r}
+USgas_best_md <- arima(train, order = c(1,1,1), seasonal = list(order = c(2,1,1)))
+
+USgas_best_md
+```
+
+```{r}
+USgas_test_fc <- forecast(USgas_best_md, h = 12)
+
+accuracy(USgas_test_fc, test)
+```
+
+```{r}
+test_forecast(USgas, forecast.obj = USgas_test_fc, test = test)
+```
+
+```{r}
+final_md <- arima(USgas, order = c(1,1,1), seasonal = list(order = c(2,1,1)))
+```
+
+```{r}
+checkresiduals(final_md)
+```
+
+```{r}
+USgas_fc <- forecast(final_md, h = 12)
+```
+
+```{r}
+plot_forecast(USgas_fc,
+              title = "US Natural Gas Consumption - Forecast",
+              Ytitle = "Billion Cubic Feet",
+              Xtitle = "Year")
+```
+
+### The auto.arima function
+
+```{r}
+USgas_auto_md1 <- auto.arima(train)
+
+USgas_auto_md1
+```
+
+```{r}
+USgas_auto_md2 <- auto.arima(train, 
+                             max.order = 5,
+                             D = 1,
+                             d = 1,
+                             stepwise = FALSE,
+                             approximation = FALSE)
+
+USgas_auto_md2
+```
+
+## Linear regression with ARIMA errors
+
+#### Violation of white noise assumption
+
+```{r}
+df <- ts_to_prophet(AirPassengers)
+
+names(df) <- c("date", "y")
+```
+
+```{r}
+df$lag12 <- dplyr::lag(df$y, n = 12)
+
+df$month <- factor(month(df$date, label = TRUE), ordered = FALSE)
+
+df$trend <- 1:nrow(df)
+```
+
+```{r}
+names(df)
+```
+
+```{r}
+par <- ts_split(ts.obj = AirPassengers, sample.out = 12)
+
+train <- par$train
+test <- par$test
+```
+
+```{r}
+md1 <- tslm(df ~ season + trend + lag12, data = train_df)
+```
+
+```{r}
+checkresiduals(md1)
+```
+
+### Modeling the residuals with the ARIMA model
+
+```{r}
+md2 <- auto.arima(train,
+                  xreg = cbind(model.matrix(~ month,train_df)[,-1],
+                  train_df$trend,
+                  train_df$lag12),
+                  seasonal = TRUE,
+                  stepwise = FALSE,
+                  approximation = FALSE)
+
+summary(md2)
+```
+
+```{r}
+checkresiduals(md2)
+```
+
+```{r}
+fc1 <- forecast(md1, newdata = test_df)
+fc2 <- forecast(md2, xreg = cbind(model.matrix(~ month, test_df)[,-1], test_df$trend, test_df$lag12))
+```
+
+```{r}
+accuracy(fc1, test)
+```
+
+```{r}
+accuracy(fc2, test)
 ```
