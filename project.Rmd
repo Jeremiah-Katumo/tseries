@@ -296,3 +296,99 @@ ts_plot(simple_ma4_ffer, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
 ts_plot(simple_ma4_indpro, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
 ts_plot(simple_ma4_ccpi, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
 ```
+
+```{r}
+ts_info(psr_ts)
+```
+
+```{r}
+psr_cyclic <- window(psr_ts, start = c(2000, 1))
+unrate_cyclic <- window(psr_ts, start = c(2000, 1))
+m2_cyclic <- window(psr_ts, start = c(2000, 1))
+pce_cyclic <- window(psr_ts, start = c(2000, 1))
+dspic_cyclic <- window(psr_ts, start = c(2000, 1))
+ir_cyclic <- window(psr_ts, start = c(2000, 1))
+ffer_cyclic <- window(psr_ts, start = c(2000, 1))
+indpro_cyclic <- window(psr_ts, start = c(2000, 1))
+ccpi_cyclic <- window(psr_ts, start = c(2000, 1))
+
+ts_plot(unrate_cyclic, type = "single", title = "US Monthly Unemployment Rate",
+        Ytitle = "Unemployment Rate (%)",
+        Xtitle = "Year", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(psr_cyclic, type = "single", title = "US Monthly Personal Saving Rate",
+        Ytitle = "Personal Saving Rate (%)",
+        Xtitle = "Year", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(m2_cyclic, type = "single", title = "US monthly m2",
+        Ytitle = "m2",
+        Xtitle = "Year", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(pce_cyclic, type = "single", title = "US Monthly Personal Consumption Expenditure",
+        Ytitle = "Personal Consumption Expenditure",
+        Xtitle = "Year", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(dspic_cyclic, type = "single", title = "US Monthly DIsposable Personal Income",
+        Ytitle = "DIsposable Personal Income",
+        Xtitle = "Year", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(ir_cyclic, type = "single", title = "US Monthly Market Yield on Securities",
+        Ytitle = "Market Yield on Securities",
+        Xtitle = "Year", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(ffer_cyclic, type = "single", title = "US Monthly Federal Funds Effective Rate",
+        Ytitle = "Federal Funds Effective Rate (%)",
+        Xtitle = "Year", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(indpro_cyclic, type = "single", title = "US Monthly ",
+        Ytitle = "INDPRO",
+        Xtitle = "Year", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(ccpi_cyclic, type = "single", title = "US Monthly",
+        Ytitle = "CCPI",
+        Xtitle = "Year", Xgrid = TRUE, Ygrid = TRUE)
+```
+
+```{r}
+ts_heatmap(unrate_ts, title = "Heatmap - the US Unemployment Rate")
+ts_heatmap(psr_ts, title = "Heatmap - the US Personal Saving Rate")
+ts_heatmap(m2_ts, title = "Heatmap - the US m2")
+ts_heatmap(pce_ts, title = "Heatmap - the US Personal Consumption Expenditure")
+ts_heatmap(dspic_ts, title = "Heatmap - the US DIsposable Personal Income")
+ts_heatmap(ir_ts, title = "Heatmap - the US Market Yield on Securities")
+ts_heatmap(ffer_ts, title = "Heatmap - the US Federal Funds Effective Rate")
+ts_heatmap(indpro_ts, title = "Heatmap - the US ")
+ts_heatmap(ccpi_ts, title = "Heatmap - the US ")
+```
+
+-   The columns seem to be cyclic rather than seasonal due to the bright vertical lines in each heatmap.
+
+```{r}
+x <- lapply(1:36, function(i) {
+  p <- Box.test(unrate_ts, lag = i, type = "Ljung-Box")
+  output <- data.frame(lag = i, p_value = p$p.value)
+  return(output) 
+}) %>% bind_rows
+
+head(x)
+```
+
+```{r}
+unrate_df <- data.frame(year = floor(time(unrate_ts)), month = cycle(unrate_ts), unrate = as.numeric(unrate_ts))
+
+# Setting the month abbreviation and transforming it to a factor
+unrate_df$month <- factor(month.abb[unrate_df$month], levels = month.abb)
+
+head(unrate_df)
+```
+
+```{r}
+unrate_summary <- unrate_df %>%
+  group_by(month) %>%
+  summarise(mean = mean(unrate), sd = sd(unrate))
+
+unrate_summary
+```
+
+```{r}
+plot_ly(data = unrate_summary,
+        x = ~ month,
+        y = ~ mean,
+        type = "bar",
+        name = "Mean"
+        ) %>%
+  layout(title = "The US Monthly Avearge Unemployment Rate",
+         yaxis = list(title = "Mean", range = c(4, 7)))
+```

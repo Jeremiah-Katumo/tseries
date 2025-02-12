@@ -92,9 +92,9 @@ str(UKgrid_df)
 -   The next step is to create seasonal features based on the periods we wish to check. For this, we will use the *lubridate* package to create indicators for the hour of the day, the day of the week, and the month by using the *hour*, *wday*, and *month* functions respectively. This will allow us to group and summarize the series based on each periodicity.
 
 ```{r}
-UKgrid_df$hour <- hour(UKgrid_df$time)
+UKgrid_df$hour <- lubridate::hour(UKgrid_df$time)
 UKgrid_df$weekday <- wday(UKgrid_df$time, label = TRUE, abbr = TRUE)
-UKgrid_df$month <- factor(month.abb[month(UKgrid_df$time)], levels = month.abb)
+UKgrid_df$month <- factor(month.abb[lubridate::month(UKgrid_df$time)], levels = month.abb)
 
 head(UKgrid_df)
 ```
