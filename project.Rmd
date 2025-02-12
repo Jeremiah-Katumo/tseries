@@ -392,3 +392,17 @@ plot_ly(data = unrate_summary,
   layout(title = "The US Monthly Avearge Unemployment Rate",
          yaxis = list(title = "Mean", range = c(4, 7)))
 ```
+
+```{r}
+unrate_df <- data.frame(time = index(unrate_xts), UKgrid = as.numeric(unrate_xts))
+
+str(unrate_df)
+```
+
+```{r}
+unrate_df$hour <- lubridate::hour(unrate_df$time)
+unrate_df$weekday <- wday(unrate_df$time, label = TRUE, abbr = TRUE)
+unrate_df$month <- factor(month.abb[lubridate::month(unrate_df$time)], levels = month.abb)
+
+head(unrate_df)
+```
