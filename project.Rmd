@@ -14,7 +14,33 @@ library(Quandl)
 library(forecast)
 library(readr)
 library(naniar)
+library(corrplot)
+library(timetk)
 ```
+
+#### Description of Dataset Columns
+
+-   psr: personal saving rate
+
+-   unrate: unemployment rate
+
+-   m2: m2
+
+-   dspic: real disposable personal income
+
+-   pce: personal consumption expenditure
+
+-   reer: real broad effective exchange rate
+
+-   ir: market yield on US securities at 10-year constant maturity
+
+-   ffer: federal funds effective rate
+
+-   tcs: total construction spending
+
+-   indpro:
+
+-   cci:
 
 ```{r}
 macro_monthly <- read_csv("~/Work/Data Science/Learning/Datasets/macro-monthly/macro_monthly.csv")
@@ -50,5 +76,85 @@ vis_miss(macro_monthly)
 ```
 
 ```{r}
+macro_monthly_cor <- cor(macro_monthly[,-1])
+macro_monthly_cor
+```
 
+```{r}
+corrplot(macro_monthly_cor)
+```
+
+-   From the correlation plot of the correlation matrix, columns *unrate and psr* are correlated with a rho=0.5. Columns *m2, dspic* and *pce each* having a strong correlation of more than 0.9. ir and ffer with rho=0.93. indpro and ccpi with rho=0.85
+
+```{r}
+macro_monthly_ts <- ts(macro_monthly, frequency = 1)
+macro_monthly_ts
+```
+
+```{r}
+unrate_psr <- macro_monthly %>% select(DATE, unrate, psr)
+head(unrate_psr)
+```
+
+```{r}
+unrate_psr_xts <- as.xts(unrate_psr)
+
+ts_plot(unrate_psr_xts)
+```
+
+```{r}
+unrate <- macro_monthly %>% select(DATE, unrate)
+psr <- macro_monthly %>% select(DATE, psr)
+
+unrate_xts <- as.xts(unrate)
+psr_xts <- as.xts(psr)
+
+ts_decompose(unrate_xts)
+```
+
+```{r}
+head(unrate_xts)
+```
+
+```{r}
+unrate$DATE <- as.Date(unrate$DATE)
+psr$DATE <- as.Date(psr$DATE)
+
+head(unrate)
+```
+
+```{r}
+unrate_ts <- tk_ts(unrate, 
+                   start = c(lubridate::year(min(macro_monthly$DATE)), 
+                             lubridate::month(min(macro_monthly$DATE))), 
+                   frequency = 12)
+
+ts_decompose(unrate_ts)
+```
+
+```{r}
+psr_ts <- tk_ts(psr, 
+                   start = c(lubridate::year(min(macro_monthly$DATE)), 
+                             lubridate::month(min(macro_monthly$DATE))), 
+                   frequency = 12)
+
+ts_decompose(psr_ts)
+```
+
+```{r}
+unrate_detrend <- unrate_ts - decompose(unrate_ts)$trend
+ts_seasonal(unrate_detrend)
+```
+
+```{r}
+psr_detrend <- psr_ts - decompose(psr_ts)$trend
+ts_seasonal(psr_detrend)
+```
+
+```{r}
+ts_cor(unrate_ts, type = "both")
+```
+
+```{r}
+ts_cor(psr_ts, type = "both")
 ```
