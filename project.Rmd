@@ -5,6 +5,7 @@ output: html_document
 
 ```{r}
 library(tidyverse)
+library(tidyr)
 library(h2o)
 library(TSstudio)
 library(plotly)
@@ -76,6 +77,15 @@ vis_miss(macro_monthly)
 ```
 
 ```{r}
+macro_monthly <- macro_monthly %>%
+  tidyr::fill(c(reer, tcs), .direction = "downup")  # Forward fill (Down), Backward fill (Up)
+```
+
+```{r}
+colSums(is.na(macro_monthly))
+```
+
+```{r}
 macro_monthly_cor <- cor(macro_monthly[,-1])
 macro_monthly_cor
 ```
@@ -93,23 +103,49 @@ macro_monthly_ts
 
 ```{r}
 unrate_psr <- macro_monthly %>% select(DATE, unrate, psr)
+m2_dspic_pce <- macro_monthly %>% select(DATE, m2, dspic, pce)
+ir_ffer <- macro_monthly %>% select(DATE, ir, ffer)
+indpro_ccpi <- macro_monthly %>% select(DATE, indpro, ccpi)
+m2_dspic_pce_tcs_indpro_ccpi <- macro_monthly %>% select(DATE, m2, dspic, pce, tcs, indpro, ccpi)
+dspic_pce_tcs_indpro_ccpi <- macro_monthly %>% select(DATE, dspic, pce, tcs, indpro, ccpi)
+
 head(unrate_psr)
 ```
 
 ```{r}
 unrate_psr_xts <- as.xts(unrate_psr)
+m2_dspic_pce_xts <- as.xts(m2_dspic_pce)
+ir_ffer_xts <- as.xts(ir_ffer)
+indpro_ccpi_xts <- as.xts(indpro_ccpi)
+m2_dspic_pce_tcs_indpro_ccpi_xts <- as.xts(m2_dspic_pce_tcs_indpro_ccpi)
+dspic_pce_tcs_indpro_ccpi_xts <- as.xts(dspic_pce_tcs_indpro_ccpi)
 
+par(mfrow=c(2,2))
 ts_plot(unrate_psr_xts)
+ts_plot(m2_dspic_pce_xts)
+ts_plot(ir_ffer_xts)
+ts_plot(indpro_ccpi_xts)
+# ts_plot(m2_dspic_pce_tcs_indpro_ccpi_xts)
+# ts_plot(dspic_pce_tcs_indpro_ccpi_xts)
+```
+
+```{r}
+names(macro_monthly)
 ```
 
 ```{r}
 unrate <- macro_monthly %>% select(DATE, unrate)
 psr <- macro_monthly %>% select(DATE, psr)
+m2 <- macro_monthly %>% select(DATE, m2)
+dspic <- macro_monthly %>% select(DATE, dspic)
+pce <- macro_monthly %>% select(DATE, pce)
+ir <- macro_monthly %>% select(DATE, ir)
+ffer <- macro_monthly %>% select(DATE, ffer)
+indpro <- macro_monthly %>% select(DATE, indpro)
+ccpi <- macro_monthly %>% select(DATE, ccpi)
 
 unrate_xts <- as.xts(unrate)
 psr_xts <- as.xts(psr)
-
-ts_decompose(unrate_xts)
 ```
 
 ```{r}
@@ -119,6 +155,13 @@ head(unrate_xts)
 ```{r}
 unrate$DATE <- as.Date(unrate$DATE)
 psr$DATE <- as.Date(psr$DATE)
+m2$DATE <- as.Date(m2$DATE)
+dspic$DATE <- as.Date(dspic$DATE)
+pce$DATE <- as.Date(pce$DATE)
+ir$DATE <- as.Date(ir$DATE)
+ffer$DATE <- as.Date(ffer$DATE)
+indpro$DATE <- as.Date(indpro$DATE)
+ccpi$DATE <- as.Date(ccpi$DATE)
 
 head(unrate)
 ```
@@ -128,37 +171,128 @@ unrate_ts <- tk_ts(unrate,
                    start = c(lubridate::year(min(macro_monthly$DATE)), 
                              lubridate::month(min(macro_monthly$DATE))), 
                    frequency = 12)
-
-ts_decompose(unrate_ts)
-```
-
-```{r}
 psr_ts <- tk_ts(psr, 
+                start = c(lubridate::year(min(macro_monthly$DATE)), 
+                             lubridate::month(min(macro_monthly$DATE))), 
+                frequency = 12)
+m2_ts <- tk_ts(m2, 
+               start = c(lubridate::year(min(macro_monthly$DATE)), 
+                             lubridate::month(min(macro_monthly$DATE))), 
+               frequency = 12)
+dspic_ts <- tk_ts(dspic, 
+                  start = c(lubridate::year(min(macro_monthly$DATE)), 
+                             lubridate::month(min(macro_monthly$DATE))), 
+                  frequency = 12)
+pce_ts <- tk_ts(pce, 
+                start = c(lubridate::year(min(macro_monthly$DATE)), 
+                             lubridate::month(min(macro_monthly$DATE))), 
+                frequency = 12)
+ir_ts <- tk_ts(ir, 
+               start = c(lubridate::year(min(macro_monthly$DATE)), 
+                             lubridate::month(min(macro_monthly$DATE))), 
+               frequency = 12)
+ffer_ts <- tk_ts(ffer, 
+                 start = c(lubridate::year(min(macro_monthly$DATE)), 
+                             lubridate::month(min(macro_monthly$DATE))), 
+                 frequency = 12)
+indpro_ts <- tk_ts(indpro, 
                    start = c(lubridate::year(min(macro_monthly$DATE)), 
                              lubridate::month(min(macro_monthly$DATE))), 
                    frequency = 12)
+ccpi_ts <- tk_ts(ccpi, 
+                 start = c(lubridate::year(min(macro_monthly$DATE)), 
+                             lubridate::month(min(macro_monthly$DATE))), 
+                 frequency = 12)
 
+ts_decompose(unrate_ts)
 ts_decompose(psr_ts)
+ts_decompose(m2_ts)
+ts_decompose(dspic_ts)
+ts_decompose(pce_ts)
+ts_decompose(ir_ts)
+ts_decompose(ffer_ts)
+ts_decompose(indpro_ts)
+ts_decompose(ccpi_ts)
 ```
 
 ```{r}
 unrate_detrend <- unrate_ts - decompose(unrate_ts)$trend
-ts_seasonal(unrate_detrend)
-```
-
-```{r}
 psr_detrend <- psr_ts - decompose(psr_ts)$trend
+m2_detrend <- m2_ts - decompose(m2_ts)$trend
+dspic_detrend <- dspic_ts - decompose(dspic_ts)$trend
+pce_detrend <- pce_ts - decompose(pce_ts)$trend
+ir_detrend <- ir_ts - decompose(ir_ts)$trend
+ffer_detrend <- ffer_ts - decompose(ffer_ts)$trend
+indpro_detrend <- indpro_ts - decompose(indpro_ts)$trend
+ccpi_detrend <- ccpi_ts - decompose(ccpi_ts)$trend
+
+ts_seasonal(unrate_detrend)
 ts_seasonal(psr_detrend)
+ts_seasonal(m2_detrend)
+ts_seasonal(dspic_detrend)
+ts_seasonal(pce_detrend)
+ts_seasonal(ir_detrend)
+ts_seasonal(ffer_detrend)
+ts_seasonal(indpro_detrend)
+ts_seasonal(ccpi_detrend)
 ```
 
 ```{r}
 ts_cor(unrate_ts, type = "both")
-```
-
-```{r}
 ts_cor(psr_ts, type = "both")
+ts_cor(m2_ts, type = "both")
+ts_cor(dspic_ts, type = "both")
+ts_cor(pce_ts, type = "both")
+ts_cor(ir_ts, type = "both")
+ts_cor(ffer_ts, type = "both")
+ts_cor(indpro_ts, type = "both")
+ts_cor(ccpi_ts, type = "both")
 ```
 
 ```{r}
+ts_lags(unrate_ts, lags = c(12, 24, 36))
+ts_lags(psr_ts, lags = c(12, 24, 36))
+ts_lags(m2_ts, lags = c(12, 24, 36))
+ts_lags(dspic_ts, lags = c(12, 24, 36))
+ts_lags(pce_ts, lags = c(12, 24, 36))
+ts_lags(ir_ts, lags = c(12, 24, 36))
+ts_lags(ffer_ts, lags = c(12, 24, 36))
+ts_lags(indpro_ts, lags = c(12, 24, 36))
+ts_lags(ccpi_ts, lags = c(12, 24, 36))
+```
 
+```{r}
+simple_ma <- function(ts.obj, order) {
+  lags <- order - 1
+  lags <- make_lags(ts.obj = ts.obj, lags = 1)
+  mean <- ts_mean(lags)
+  un <- ts.union(ts.obj, mean)
+  colnames(un) <- c("Original", "Transformed")
+  
+  return(un)
+}
+```
+
+```{r}
+simple_ma4_unrate <- simple_ma(unrate_ts, order = 4)
+simple_ma4_psr <- simple_ma(psr_ts, order = 4)
+simple_ma4_m2 <- simple_ma(m2_ts, order = 4)
+simple_ma4_pce <- simple_ma(pce_ts, order = 4)
+simple_ma4_dspic <- simple_ma(dspic_ts, order = 4)
+simple_ma4_ir <- simple_ma(ir_ts, order = 4)
+simple_ma4_ffer <- simple_ma(ffer_ts, order = 4)
+simple_ma4_indpro <- simple_ma(indpro_ts, order = 4)
+simple_ma4_ccpi <- simple_ma(ccpi_ts, order = 4)
+```
+
+```{r}
+ts_plot(simple_ma4_unrate, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(simple_ma4_psr, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(simple_ma4_m2, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(simple_ma4_pce, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(simple_ma4_dspic, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(simple_ma4_ir, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(simple_ma4_ffer, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(simple_ma4_indpro, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(simple_ma4_ccpi, type = "multiple", Xgrid = TRUE, Ygrid = TRUE)
 ```
