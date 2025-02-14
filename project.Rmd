@@ -17,6 +17,14 @@ library(readr)
 library(naniar)
 library(corrplot)
 library(timetk)
+library(tseries)
+library(lmtest)
+library(dtw)
+library(reshape2)
+library(gganimate)
+library(WaveletComp)
+library(tuneR)
+library(seewave)
 ```
 
 #### Description of Dataset Columns
@@ -112,6 +120,8 @@ dspic_pce_tcs_indpro_ccpi <- macro_monthly %>% select(DATE, dspic, pce, tcs, ind
 head(unrate_psr)
 ```
 
+## Time Series Structure
+
 ```{r}
 unrate_psr_xts <- as.xts(unrate_psr)
 m2_dspic_pce_xts <- as.xts(m2_dspic_pce)
@@ -121,10 +131,10 @@ m2_dspic_pce_tcs_indpro_ccpi_xts <- as.xts(m2_dspic_pce_tcs_indpro_ccpi)
 dspic_pce_tcs_indpro_ccpi_xts <- as.xts(dspic_pce_tcs_indpro_ccpi)
 
 par(mfrow=c(2,2))
-ts_plot(unrate_psr_xts)
-ts_plot(m2_dspic_pce_xts)
-ts_plot(ir_ffer_xts)
-ts_plot(indpro_ccpi_xts)
+ts_plot(unrate_psr_xts, Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(m2_dspic_pce_xts, Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(ir_ffer_xts, Xgrid = TRUE, Ygrid = TRUE)
+ts_plot(indpro_ccpi_xts, Xgrid = TRUE, Ygrid = TRUE)
 # ts_plot(m2_dspic_pce_tcs_indpro_ccpi_xts)
 # ts_plot(dspic_pce_tcs_indpro_ccpi_xts)
 ```
@@ -165,6 +175,8 @@ ccpi$DATE <- as.Date(ccpi$DATE)
 
 head(unrate)
 ```
+
+### 1. Decomposition
 
 ```{r}
 unrate_ts <- tk_ts(unrate, 
@@ -235,30 +247,6 @@ ts_seasonal(ir_detrend)
 ts_seasonal(ffer_detrend)
 ts_seasonal(indpro_detrend)
 ts_seasonal(ccpi_detrend)
-```
-
-```{r}
-ts_cor(unrate_ts, type = "both")
-ts_cor(psr_ts, type = "both")
-ts_cor(m2_ts, type = "both")
-ts_cor(dspic_ts, type = "both")
-ts_cor(pce_ts, type = "both")
-ts_cor(ir_ts, type = "both")
-ts_cor(ffer_ts, type = "both")
-ts_cor(indpro_ts, type = "both")
-ts_cor(ccpi_ts, type = "both")
-```
-
-```{r}
-ts_lags(unrate_ts, lags = c(12, 24, 36))
-ts_lags(psr_ts, lags = c(12, 24, 36))
-ts_lags(m2_ts, lags = c(12, 24, 36))
-ts_lags(dspic_ts, lags = c(12, 24, 36))
-ts_lags(pce_ts, lags = c(12, 24, 36))
-ts_lags(ir_ts, lags = c(12, 24, 36))
-ts_lags(ffer_ts, lags = c(12, 24, 36))
-ts_lags(indpro_ts, lags = c(12, 24, 36))
-ts_lags(ccpi_ts, lags = c(12, 24, 36))
 ```
 
 ```{r}
@@ -394,7 +382,7 @@ plot_ly(data = unrate_summary,
 ```
 
 ```{r}
-unrate_df <- data.frame(time = index(unrate_xts), UKgrid = as.numeric(unrate_xts))
+unrate_df <- data.frame(time = index(unrate_xts), unrate = as.numeric(unrate_xts))
 
 str(unrate_df)
 ```
@@ -405,4 +393,275 @@ unrate_df$weekday <- wday(unrate_df$time, label = TRUE, abbr = TRUE)
 unrate_df$month <- factor(month.abb[lubridate::month(unrate_df$time)], levels = month.abb)
 
 head(unrate_df)
+```
+
+```{r}
+# Summarise the series by its hourly cycle
+unrate_hourly <- unrate_df %>%
+  group_by(hour) %>%
+  summarise(mean = mean(unrate, na.rm = TRUE), sd = sd(unrate, na.rm = TRUE))
+
+head(unrate_hourly)
+```
+
+```{r}
+unrate_daily <- unrate_df %>%
+  group_by(weekday) %>%
+  summarise(mean = mean(unrate, na.rm = TRUE), sd = sd(unrate, na.rm = TRUE))
+
+unrate_daily
+```
+
+```{r}
+plot_ly(data = unrate_daily,
+        x = ~ weekday,
+        y = ~ mean,
+        type = "bar"
+       ) %>%
+  layout(title = "The Daily Unemployment Rate by Weekday",
+         yaxis = list(title = "Mean", range = c(4, 8)),
+         xaxis = list(title = "Weekday"))
+```
+
+-   The average of the weekdays show that a matching average value in some of the days. This shows that our data is not seasonal
+
+```{r}
+ggplot(unrate_df, aes(x = unrate)) +
+  geom_density(aes(fill = month)) +
+  ggtitle("Uemployment Rate - Kernel Density by Month") +
+  facet_grid(rows = vars(as.factor(month)))
+```
+
+```{r}
+unrate_df$unrate_detrend <- unrate_df$unrate - decompose(unrate_ts)$trend
+
+ggplot(unrate_df, aes(x = unrate_detrend)) +
+  geom_density(aes(fill = month)) +
+  ggtitle("Unemployment Rate - Kernel Density Estimates by Month") +
+  facet_grid(rows = vars(as.factor(month)))
+```
+
+```{r}
+unrate_df$weekday <- as.factor(unrate_df$weekday)
+
+unrate_df %>%
+  ggplot(aes(x = unrate)) +
+    geom_density(aes(fill = as.factor(weekday))) +
+    ggtitle("Unemployment Rate - Kernel Density Estimates by Day") +
+    facet_grid(rows = vars(as.factor(weekday)))
+```
+
+```{r}
+ggplot(unrate_df, aes(x = unrate_detrend)) +
+  geom_density(aes(fill = weekday)) +
+  ggtitle("Unemployment Rate - Kernel Density Estimates by Month") +
+  facet_grid(rows = vars(as.factor(weekday)))
+```
+
+### Correlation Analysis
+
+```{r}
+ts_cor(unrate_ts, type = "both", lag.max = 60)
+ts_cor(psr_ts, type = "both", lag.max = 60)
+ts_cor(m2_ts, type = "both", lag.max = 60)
+ts_cor(dspic_ts, type = "both", lag.max = 60)
+ts_cor(pce_ts, type = "both", lag.max = 60)
+ts_cor(ir_ts, type = "both", lag.max = 60)
+ts_cor(ffer_ts, type = "both", lag.max = 60)
+ts_cor(indpro_ts, type = "both", lag.max = 60)
+ts_cor(ccpi_ts, type = "both", lag.max = 60)
+```
+
+```{r}
+ts_lags(unrate_ts, lags = c(12, 24, 36, 48, 60, 72))
+ts_lags(psr_ts, lags = c(12, 24, 36, 48, 60, 72))
+ts_lags(m2_ts, lags = c(12, 24, 36, 48, 60, 72))
+ts_lags(dspic_ts, lags = c(12, 24, 36, 48, 60, 72))
+ts_lags(pce_ts, lags = c(12, 24, 36, 48, 60, 72))
+ts_lags(ir_ts, lags = c(12, 24, 36, 48, 60, 72))
+ts_lags(ffer_ts, lags = c(12, 24, 36, 48, 60, 72))
+ts_lags(indpro_ts, lags = c(12, 24, 36, 48, 60, 72))
+ts_lags(ccpi_ts, lags = c(12, 24, 36, 48, 60, 72))
+```
+
+## Causality Tests
+
+```{r}
+psr_cyclic <- window(psr_ts, start = c(2000, 1))
+unrate_cyclic <- window(psr_ts, start = c(2000, 1))
+m2_cyclic <- window(psr_ts, start = c(2000, 1))
+pce_cyclic <- window(psr_ts, start = c(2000, 1))
+dspic_cyclic <- window(psr_ts, start = c(2000, 1))
+ir_cyclic <- window(psr_ts, start = c(2000, 1))
+ffer_cyclic <- window(psr_ts, start = c(2000, 1))
+indpro_cyclic <- window(psr_ts, start = c(2000, 1))
+ccpi_cyclic <- window(psr_ts, start = c(2000, 1))
+```
+
+```{r}
+head(psr_cyclic)
+```
+
+```{r}
+psr_unrate_combined <- cbind(psr_cyclic, unrate_cyclic)
+
+psr_unrate_combined <- as.data.frame(psr_unrate_combined)
+
+head(psr_unrate_combined)
+```
+
+```{r}
+plot_ly(x = time(psr_cyclic), y = ~ psr_cyclic, type = "scatter", 
+        mode = "line", name = "Personal Savings Rate") %>%
+  add_lines(x = time(unrate_cyclic), y = ~ unrate_cyclic, name = "Unemployment Rate", yaxis = "y2") %>%
+  layout(title = "Total Monthly Personal Saving vs Unemployment Rate in the US",
+         yaxis2 = list(overlaying = "y", side = "right", title = "Percentage UNRate", showgrid = TRUE),
+         yaxis = list(title = "Percentage PSR", showgrid = TRUE),
+         legend = list(orientation = 'h'),
+         margin = list(l = 50, r = 50, b = 50, t = 50, pad = 2))
+```
+
+```{r}
+ccf_plot(x = psr_ts[,1], y = unrate_ts[,1], lags = 0:12)
+ccf_plot(x = pce_ts[,1], y = dspic_ts[,1], lags = 0:12)
+ccf_plot(x = ir_ts[,1], y = ffer_ts[,1], lags = 0:12)
+ccf_plot(x = indpro_ts[,1], y = ccpi_ts[,1], lags = 0:12)
+```
+
+```{r}
+head(psr_ts)
+```
+
+```{r}
+ccf(x = as.numeric(psr_ts), y = as.numeric(unrate_ts), lags = 0:12)
+```
+
+#### Granger Causality
+
+-   To check if one time series can predict another:
+
+```{r}
+grangertest(psr_ts ~ unrate_ts, order = 2)  # Test if unrate_ts causes psr_ts
+```
+
+```{r}
+grangertest(unrate_ts ~ psr_ts, order = 2)  # Test if psr_ts causes unrate_ts
+```
+
+-   If `p-value < 0.05`, the independent variable significantly influences the dependent variable.
+
+```{r}
+lags <- 1:12
+p_values <- sapply(lags, function(lag) grangertest(psr_ts ~ unrate_ts, order = lag)$`Pr(>F)`[2])
+
+df_gc <- data.frame(Lag = lags, P_Value = p_values)
+ggplot(df_gc, aes(x = Lag, y = P_Value, fill = P_Value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0.05) +
+  labs(title = "Granger Causality Heatmap", x = "Lag", y = "P-Value") +
+  theme_minimal()
+```
+
+#### **Cointegration Test (Engle-Granger)**
+
+If two time series are non-stationary but move together over time, they may be cointegrated.
+
+```{r}
+adf.test(psr_ts)  # Check stationarity
+adf.test(unrate_ts)
+```
+
+```{r}
+# If both are non-stationary, test for cointegration
+residuals <- lm(psr_ts ~ unrate_ts)$residuals
+adf.test(residuals)  # If p < 0.05, they are cointegrated
+```
+
+-   The two series are not cointegrated
+
+#### **Dynamic Time Warping (DTW)**
+
+-   If the time series are not aligned, DTW can compare them:
+
+```{r}
+alignment <- dtw(psr_ts, unrate_ts)
+plot(alignment)
+```
+
+#### Spectral Analysis
+
+-   To determine dominant frequencies in time series.
+
+```{r}
+spectrum(psr_ts, main = "Periodogram of psr_ts")
+spectrum(unrate_ts, main = "Periodogram of unrate_ts")
+```
+
+```{r}
+ccf_values <- ccf(psr_ts[,1], unrate_ts[,1], lag.max = 12, plot = FALSE)
+lags <- ccf_values$lag
+correlations <- ccf_values$acf
+
+lags_cors_df <- data.frame(lag = lags, correlation = correlations)
+ggplot(lags_cors_df, aes(x = lag, y = correlation, fill = correlation)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0) +
+  labs(title = "Cross-Correlation Heatmap", x = "Lag", y = "Correlation") +
+  theme_minimal()
+```
+
+#### **Rolling Window Correlation (Animated!)** 📊
+
+-   To track how correlation changes over time
+
+```{r}
+rolling_corr <- rollapply(cbind(psr_ts, unrate_ts), width = 12,
+                          FUN = function(x) cor(x[,1],x[,2], use = "complete.obs"),
+                          by.column = FALSE, align = "right")
+
+df_rolling <- data.frame(time = time(rolling_corr), correlation = rolling_corr)
+head(df_rolling)
+```
+
+```{r}
+# change the type of time column to numeric in order to plot the time correlation
+df_rolling$time <- as.numeric(as.character(df_rolling$time))
+df_rolling
+```
+
+```{r}
+ggplot(df_rolling, aes(x = time, y = correlation)) +
+  geom_line(color = "blue", size = 1) +
+  labs(title = "Rolling Correlation Over Time", y = "Correlation", x = "Time") +
+  theme_minimal() +
+  transition_reveal(time)
+```
+
+**🔥 Why?**
+
+-   Shows **how correlation strength changes dynamically** over time.
+
+-   Can detect **shifts in trends**.
+
+#### **Wavelet Coherence (For Non-Stationary Data)** 🌊
+
+-   If trends shift **over time and frequency**, use **wavelet coherence** analysis:
+
+```{r}
+psr_unrate_ts <- data.frame(time = 1:length(psr_ts), psr = psr_ts, unrate = unrate_ts)
+
+wave <- analyze.coherency(psr_unrate_ts, my.pair = c("psr","unrate"), 
+                          loess.span = 0, make.pval = TRUE, n.sim = 100)
+
+wc.image(wave, n.levels = 250, legend.params = list(lab = "Wavelet Coherence"))
+```
+
+**🔥 Why?**
+
+-   Detects **both time and frequency relationships**.
+
+-   Finds **hidden correlations that change over time**.
+
+```{r}
+
 ```

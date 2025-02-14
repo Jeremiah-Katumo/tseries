@@ -62,9 +62,13 @@ pacf(USgas, lag.max = 60)
 
 ### Lag Plots
 
+-   A lag plot is a simplistic and non-statistical approach for analyzing the relationship between a series and its lags. As the name indicates, this method is based on data visualization tools, with the use of two-dimensional scatter plots for visualizing the series (typically on the y-axis) against the k lag of the series. Hence, each pair of points represents a combination of the series observations and their corresponding lagged values. As more points on the lag plot are closer to the 45 degree line, the higher the correlation will be between the series and the corresponding lag.
+
 ```{r}
 ts_lags(USgas)
 ```
+
+-   Looking at the lag plots of the USgas series, you can see that, moving along from the first lag up to the sixth lag, the relationship between the series and its lags become less linear. This process starts to reverse from the seventh lag as the relationship gradually becomes more linear, where the seasonal lag (or lag 12) has the strongest relationship with the series. Those results are aligned with the ones we saw earlier with the ACF plot. By default, the ts_lags function plots the first 12 lags of the series, where the lag argument allows you to set the number of lags.
 
 ```{r}
 ts_lags(USVSales)
@@ -142,8 +146,4 @@ ccf(x = us_vsales, y = us_unrate, lag.max = 36)
 
 ```{r}
 ccf_plot(x = USVSales, y = USUnRate, lags = 0:12)
-```
-
-```{r}
-
 ```
