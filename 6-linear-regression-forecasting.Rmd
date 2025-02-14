@@ -74,7 +74,7 @@ head(USgas_df)
 -   The second feature we want to create is the seasonal component. Since we want to measure the contribution of each frequency unit to the oscillation of the series, we will use a categorical variable for each frequency unit. In the case of the USgas series, the frequency units represent the months of the year, and, therefore, we will create a categorical variable with 12 categories, each category corresponding to a specific month of the year. We will use the month function from the lubridate package to extract the month of the year from the ds date variable:
 
 ```{r}
-USgas_df$seasonal <- factor(month(USgas_df$ds, label = TRUE), ordered = FALSE)
+USgas_df$seasonal <- factor(lubridate::month(USgas_df$ds, label = TRUE), ordered = FALSE)
 
 head(USgas_df)
 ```
@@ -251,7 +251,7 @@ summary(model_tslm)
 ```{r}
 r <- which(USgas_df$ds == as.Date("2014-01-01"))
 
-USgas_df$s_break <- ifelse(year(USgas_df$ds) >= 2010, 1, 0)
+USgas_df$s_break <- ifelse(lubridate::year(USgas_df$ds) >= 2010, 1, 0)
 USgas_df$s_break[r] <- 1
 ```
 
@@ -283,20 +283,25 @@ ts_plot(UKdaily,
 ```
 
 ```{r}
-ts_heatmap(UKdaily[which(year(UKdaily$TIMESTAMP) >= 2016), ], 
+ts_heatmap(UKdaily[which(lubridate::year(UKdaily$TIMESTAMP) >= 2016), ], 
            title = "UK Daily National Grid Demand Heatmap")
 ```
 
 ## Preprocessing and feature engineering
 
 ```{r}
+days_of_week <- c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+
 UKdaily <- UKdaily %>%
-  mutate(weekday = wday(TIMESTAMP, label = TRUE),
-         month = month(TIMESTAMP, label = TRUE),
-         hour = factor(hour(TIMESTAMP), ordered = TRUE),
-         lag365 = dplyr::lag(ND, 365)) %>%
+  mutate(
+    weekday = factor(wday(TIMESTAMP), levels = 1:7, labels = days_of_week),
+    month = factor(lubridate::month(TIMESTAMP), levels = 1:12, labels = month.name),
+    hour = factor(lubridate::hour(TIMESTAMP), ordered = TRUE),
+    lag365 = dplyr::lag(ND, 365)
+  ) %>%
   filter(!is.na(lag365)) %>%
   arrange(TIMESTAMP)
+
 
 str(UKdaily)
 ```
@@ -308,7 +313,7 @@ head(UKdaily)
 ```{r}
 start_date <- min(UKdaily$TIMESTAMP)
 
-start <- c(year(start_date), yday(start_date))
+start <- c(lubridate::year(start_date), yday(start_date))
 
 UK_ts <- xts(x = UKdaily,
              order.by = UKdaily$TIMESTAMP,
@@ -369,18 +374,20 @@ accuracy(model_forecast, test_ts)
 
 ```{r}
 UKdaily <- UKdaily %>%
-  mutate(weekday = wday(TIMESTAMP, label = TRUE),
-         month = month(TIMESTAMP, label = TRUE),
-         hour = factor(hour(TIMESTAMP), ordered = TRUE),
-         lag365 = dplyr::lag(ND, 365)) %>%
+  mutate(
+    weekday = wday(TIMESTAMP, label = TRUE),
+    month = lubridate::month(TIMESTAMP, label = TRUE),
+    hour = factor(lubridate::hour(TIMESTAMP), ordered = TRUE),
+    lag365 = dplyr::lag(ND, 365)
+  ) %>%
   filter(!is.na(lag365)) %>%
   arrange(TIMESTAMP)
+```
 
+```{r}
 start_date <- min(UKdaily$TIMESTAMP)
-start <- c(year(start_date), yday(start_date))
-UK_ts <- ts(UKdaily$ND,
-             start = start,
-             frequency = 365)
+start <- c(lubridate::year(start_date), yday(start_date))
+UK_ts <- ts(UKdaily$ND, start = start, frequency = 365)
 
 UKpartitions <- ts_split(UK_ts, sample.out = h)
 train_ts <- UKpartitions$train
@@ -395,7 +402,7 @@ head(train_ts)
 ```
 
 ```{r}
-model_tslm4 <- tslm(train_df ~ season + trend + weekday + month, data = train_df)
+model_tslm4 <- tslm(train_ts ~ season + trend + weekday + month, data = train_df)
 
 model_forecast2 <- forecast(model_tslm4, h = h)
 ```
@@ -425,12 +432,13 @@ UK_fc_df <- data.frame(date = seq.Date(from = max(UKdaily$TIMESTAMP) + days(1),
 
 ```{r}
 UK_fc_df$wday <- factor(wday(UK_fc_df$date, label = TRUE), ordered = FALSE)
-UK_fc_df$month <- factor(month(UK_fc_df$date, label = TRUE), ordered = FALSE)
+UK_fc_df$month <- factor(lubridate::month(UK_fc_df$date, label = TRUE), 
+                         ordered = FALSE)
 UK_fc_df$lag365 <- tail(UKdaily$ND, h)
 ```
 
 ```{r}
-UKgrid_fc <- forecast(final_md, h = h, newdata = UK_fc_df)
+UKgrid_fc <- forecast(final_model, h = h, newdata = UK_fc_df)
 ```
 
 ```{r}

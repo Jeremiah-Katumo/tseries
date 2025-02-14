@@ -439,10 +439,6 @@ shallow_grid <- ts_grid(train,
 ```
 
 ```{r}
-shallow_grid
-```
-
-```{r}
 shallow_grid$grid_df
 ```
 

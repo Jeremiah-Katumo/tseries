@@ -665,3 +665,189 @@ wc.image(wave, n.levels = 250, legend.params = list(lab = "Wavelet Coherence"))
 ```{r}
 
 ```
+
+## FORECASTING
+
+```{r}
+partition <- ts_split(unrate_ts, sample.out = 12)
+
+unrate_train <- partition$train
+unrate_test <- partition$test
+```
+
+```{r}
+auto_arima_mdl <- auto.arima(unrate_train)
+
+summary(auto_arima_mdl)
+```
+
+```{r}
+checkresiduals(auto_arima_mdl)
+```
+
+-   The Ljung-Box test p-value is higher tha 0.05, therfore, we reject the null hypothesis with a level of significance 0.01. Hence, there is no correlation between residual series and its lags are different from zero.
+
+-   The best fitted arima model is ARIMA(0,1,0)
+
+-   The ACF plot can provide additional support for that as well. This indicates the model did not capture all of the series patterns, and may want to tune the model parameters.
+
+```{r}
+model_forecast <- forecast(auto_arima_mdl, h = 12)
+
+accuracy(model_forecast, unrate_test)
+```
+
+```{r}
+test_forecast(actual = unrate_ts, forecast.obj = model_forecast, test = unrate_test)
+```
+
+## Forecasting Using Linear Regression
+
+```{r}
+unrate_df <- ts_to_prophet(unrate_ts)
+
+head(unrate_df)
+```
+
+```{r}
+unrate_df$trend <- 1:nrow(unrate_df)
+
+head(unrate_df)
+```
+
+```{r}
+unrate_df$seasonal <- factor(lubridate::month(unrate_df$ds, label = TRUE), ordered = FALSE)
+
+head(unrate_df)
+```
+
+```{r}
+h <- 12 # setting a testing partition length
+
+unrate_train <- unrate_df[1:(nrow(unrate_df) - h), ]
+unrate_test <- unrate_df[(nrow(unrate_df) - h + 1):nrow(unrate_df), ]
+```
+
+```{r}
+lm_model_trend <- lm(y ~ trend, data = unrate_df)
+summary(lm_model_trend)
+```
+
+```{r}
+unrate_train$yhat <- predict(lm_model_trend, newdata = unrate_train)
+
+unrate_test$yhat <- predict(lm_model_trend, newdata = unrate_test)
+```
+
+```{r}
+lm_model_plot <- function(data, train, test, title = NULL) {
+  p <- plot_ly(data = data,
+               x = ~ ds, y = ~ y,
+               type = "scatter",
+               mode = "line",
+               name = "Actual") %>%
+    add_lines(x = ~ train$ds,
+              y = ~ train$yhat,
+              line = list(color = "red"),
+              name = "Fitted") %>%
+    add_lines(x = ~ test$ds,
+              y = ~ test$yhat,
+              line = list(color = "green", dash = "dot", width = 3),
+              name = "Forecasted") %>%
+    layout(title = title,
+           xaxis = list(title = "Year"),
+           yaxis = list(title = "Billion Cubic Feet"),
+           legend = list(x = 0.05, y = 0.95))
+  
+  return(p)
+}
+```
+
+```{r}
+lm_model_plot(data = unrate_df, train = unrate_train, test = unrate_test,
+              title = "Predicting Trend of Unemployment Rate")
+```
+
+```{r}
+trend_mape <- c(mean(abs(unrate_train$y - unrate_train$yhat) / unrate_train$y),
+                mean(abs(unrate_test$y - unrate_test$yhat) / unrate_test$y))
+trend_mape
+```
+
+```{r}
+lm_model_seasonal <- lm(y ~ seasonal, data = unrate_train)
+summary(lm_model_seasonal)
+```
+
+```{r}
+unrate_train$yhat <- predict(lm_model_seasonal, newdata = unrate_train)
+unrate_test$yhat <- predict(lm_model_seasonal, newdata = unrate_test)
+
+lm_model_plot(data = unrate_df, train = unrate_train, test = unrate_test, 
+              title = "Predicting Seasonality of the Series")
+```
+
+```{r}
+seasonal_mape <- c(mean(abs(gas_train$y - gas_train$yhat) / gas_train$y),
+                mean(abs(gas_test$y - gas_test$yhat) / gas_test$y))
+seasonal_mape
+```
+
+```{r}
+lm_model_comb <- lm(y ~ seasonal + trend, data = unrate_train)
+summary(lm_model_comb)
+```
+
+```{r}
+unrate_train$yhat <- predict(model_comb, newdata = unrate_train)
+unrate_test$yhat <- predict(model_comb, newdata = unrate_test)
+
+lm_model_plot(data = unrate_df,
+              train = unrate_train,
+              test = unrate_test,
+              title = "Predicting Trend and Seasonality Components")
+```
+
+```{r}
+combined_mape <- c(mean(abs(gas_train$y - gas_train$yhat) / gas_train$y),
+                mean(abs(gas_test$y - gas_test$yhat) / gas_test$y))
+combined_mape
+```
+
+```{r}
+unrate_split <- ts_split(unrate_ts, sample.out = 12)
+
+train.ts <- unrate_split$train
+test.ts <- unrate_split$test
+```
+
+```{r}
+tslm_model <- tslm(unrate_ts ~ season  + (season^2) + trend + I(trend^2), data = unrate_df)
+summary(tslm_model)
+```
+
+```{r}
+anova(tslm_model)
+```
+
+```{r}
+unrate_df <- unrate_df %>%
+  mutate(
+    weekday = wday(ds, label = TRUE),
+    month = lubridate::month(ds, label = TRUE),
+    lag365 = dplyr::lag(y, 365)
+  ) %>%
+  filter(!is.na(lag365)) %>%
+  arrange(ds)
+
+head(unrate_df)
+```
+
+```{r}
+tslm_model2 <- tslm(train.ts ~ season + trend + weekday + month + lag365, data = unrate_df)
+summary(tslm_model2)
+```
+
+```{r}
+tslm_forecast <- forecast(tslm_model2)
+```
