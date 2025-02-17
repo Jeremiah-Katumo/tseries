@@ -844,10 +844,62 @@ head(unrate_df)
 ```
 
 ```{r}
-tslm_model2 <- tslm(train.ts ~ season + trend + weekday + month + lag365, data = unrate_df)
-summary(tslm_model2)
+tslm_forecast <- forecast(tslm_model)
+```
+
+## Forecasting Using Exponential Smoothing
+
+```{r}
+simple_moving_average <- function(df, horizon, m, weight = NULL) {
+  # Error handling
+  if (horizon > nrow(df)) {
+    stop("The length of the forecast horizon must be shorter than the length of the series")
+  }
+  
+  if (m > nrow(df)) {
+    stop("The length of the rolling windoe must be shorter than the length of the series.")
+  }
+  
+  if (!is.null(weight)) {
+    if (length(weight) != m) {
+      stop("The weight argument is not aligned with the length of the rolling window.")
+    } else if (sum(weight) != 1) {
+      stop("The sum of the average weight is different")
+    }
+  }
+  
+  # Setting the average weights
+  if (is.null(weight)) {
+    weight <- rep(1 / m, m)
+  }
+  
+  # Setting the dataframe
+  names(df)[1] <- "date"
+  # Set train and test sets according to forecast horizon
+  df$type <- c(rep("train", nrow(df) - horizon), 
+               rep("test", horizon))
+  # Spreading the table by partition
+  df1 <- df %>% spread(key = type, value = y)
+  
+  # create target variable
+  df1$yhat <- df1$train
+  
+  # simple moving average
+  for (i in (nrow(df) - horizon + 1):nrow(df1)) {
+    r <- (i - m):(i - 1)
+    df1$yhat[i] <- sum(df1$yhat[r] * weight)
+  }
+  
+  # dropping from the yhat variable the actual values
+  # that were used for the rolling window
+  df1$yhat <- ifelse(is.na(df1$test), NA, df1$yhat)
+  
+  df1$y <- ifelse(is.na(df1$test), df1$train, df1$test)
+  
+  return(df1)
+}
 ```
 
 ```{r}
-tslm_forecast <- forecast(tslm_model2)
+
 ```
