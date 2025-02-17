@@ -901,5 +901,54 @@ simple_moving_average <- function(df, horizon, m, weight = NULL) {
 ```
 
 ```{r}
+head(unrate)
+```
 
+```{r}
+unrate_df <- ts_to_prophet(unrate_ts)
+head(unrate_df)
+```
+
+```{r}
+typeof(unrate_df)
+```
+
+```{r}
+unrate_fc_m1 <- simple_moving_average(unrate_df, horizon = 24, m = 1)
+unrate_fc_m6 <- simple_moving_average(unrate_df, horizon = 24, m = 6)
+unrate_fc_m12 <- simple_moving_average(unrate_df, horizon = 24, m = 12)
+unrate_fc_m24 <- simple_moving_average(unrate_df, horizon = 24, m = 24)
+unrate_fc_m36 <- simple_moving_average(unrate_df, horizon = 24, m = 36)
+unrate_fc_m48 <- simple_moving_average(unrate_df, horizon = 24, m = 48)
+unrate_fc_m60 <- simple_moving_average(unrate_df, horizon = 24, m = 60)
+```
+
+```{r}
+names(unrate_fc_m1)
+```
+
+```{r}
+plot_ly(data = unrate_df[450:nrow(unrate_df), ], x = ~ ds, y = ~ y, type = "scatter", 
+        mode = "lines", name = "Actual") %>%
+  add_lines(x = unrate_fc_m1$date, y = unrate_fc_m1$yhat, name = "Simple Moving Average - 1",
+            line = list(dash = "dash")) %>%
+  add_lines(x = unrate_fc_m6$date, y = unrate_fc_m6$yhat, name = "Simple Moving Average - 6",
+            line = list(dash = "dash")) %>%
+  add_lines(x = unrate_fc_m12$date, y = unrate_fc_m12$yhat, name = "Simple Moving Average - 12",
+            line = list(dash = "dash")) %>%
+  add_lines(x = unrate_fc_m24$date, y = unrate_fc_m24$yhat, name = "Simple Moving Average - 24",
+            line = list(dash = "dash")) %>%
+  add_lines(x = unrate_fc_m36$date, y = unrate_fc_m36$yhat, name = "Simple Moving Average - 36",
+            line = list(dash = "dash")) %>%
+  add_lines(x = unrate_fc_m48$date, y = unrate_fc_m48$yhat, name = "Simple Moving Average - 48",
+            line = list(dash = "dash")) %>%
+  add_lines(x = unrate_fc_m60$date, y = unrate_fc_m60$yhat, name = "Simple Moving Average - 60",
+            line = list(dash = "dash")) %>%
+  layout(title = "Forecasting Unemployment Rates",
+         xaxis = list(title = ""),
+         yaxis = list(title = "Percentage (%)"))
+```
+
+```{r}
+dim(unrate_df)
 ```
