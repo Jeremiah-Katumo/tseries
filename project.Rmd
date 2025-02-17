@@ -968,3 +968,29 @@ plot_ly(data = unrate_df, x = ~ds, y = ~y, type = "scatter", mode = "lines", nam
          yaxis = list(title = "Percentage Unemployment Rate (%)"),
          xaxis = list(title = "Year"))
 ```
+
+```{r}
+# Simple Exponential Smoothing
+unrate_train <- partition$train
+unrate_test <- partition$test
+
+ses_fc <- ses(unrate_train, h = 12, initial = "optimal")
+
+ses_fc$model
+```
+
+```{r}
+test_forecast(actual = unrate_ts, forecast.obj = ses_fc, test = unrate_test) %>%
+  layout(title = "Unemployment Rate vs Actual",
+         xaxis = list(range = c(2000, 2021)),
+         yaxis = list(title = "Percentage Unemployment Rate (%)"))
+```
+
+```{r}
+plot_forecast(ses_fc) %>%
+  add_lines(x = time(unrate_test) + deltat(unrate_test), y = as.numeric(unrate_test),
+            name = "Testing Partition") %>%
+  layout(title = "Unemployment Rate Forecast vs Actual",
+         xaxis = list(range = c(2000, 2022)),
+         yaxis = list(title = "Percentage Unemployment Rate (%)"))
+```

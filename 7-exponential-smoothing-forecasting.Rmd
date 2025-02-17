@@ -443,7 +443,11 @@ shallow_grid$grid_df
 ```
 
 ```{r}
-plot_grid(shallow_grid$grid_df)
+names(shallow_grid)
+```
+
+```{r}
+plot_grid(shallow_grid)
 ```
 
 ```{r}
@@ -473,5 +477,5 @@ accuracy(forecast_hw_grid, test)
 ```
 
 ```{r}
-test_forecast(actual = USgas, forecast.obj = fc_hw_grid, test = test)
+test_forecast(actual = USgas, forecast.obj = forecast_hw_grid, test = test)
 ```
