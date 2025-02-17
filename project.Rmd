@@ -955,7 +955,16 @@ dim(unrate_df)
 
 ```{r}
 # Weighted moving average
-unrate_fc_wma12 <- simple_moving_average(unrate_df, horizon = 24, m = 12, weight = c(1, rep(0, 11)))
+unrate_fc_wma12a <- simple_moving_average(unrate_df, horizon = 24, m = 12, weight = c(1, rep(0, 11)))
 
+unrate_fc_wma12b <- simple_moving_average(unrate_df, horizon = 24, m = 12, weight = c(.8, rep(0, 10), .2))
+```
 
+```{r}
+plot_ly(data = unrate_df, x = ~ds, y = ~y, type = "scatter", mode = "lines", name = "Actual") %>%
+  add_lines(x = unrate_fc_wma12a$date, y = unrate_fc_wma12a$yhat, name = "WMA", line = list(dash = "dash")) %>%
+  add_lines(x = unrate_fc_wma12b$date, y = unrate_fc_wma12b$yhat, name = "WMA - 12 (0.2/0.8)") %>%
+  layout(title = "Forecasting Unemployment Rate in the US",
+         yaxis = list(title = "Percentage Unemployment Rate (%)"),
+         xaxis = list(title = "Year"))
 ```
