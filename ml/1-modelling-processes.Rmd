@@ -112,3 +112,44 @@ h2o.cv <- h2o.glm(
 ```{r}
 vfold_cv(ames, v = 10)
 ```
+
+#### 2. Bootstrapping
+
+```{r}
+bootstraps(ames, times = 10)
+```
+
+```{r}
+split <- initial_split(ames, prop = 0.7, strata = "Sale_Price")
+
+ames_train <- training(split)
+ames_test <- testing(split)
+```
+
+```{r}
+# Specify resampling strategy
+cv <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 5
+)
+
+# Create grid of hyperparameter values
+hyper_grid <- expand.grid(k = seq(2, 25, by = 1))
+
+# Tune a knn model using grid search
+knn_fit <- train(
+  Sale_Price ~ .,
+  data = ames_train,
+  method = "knn",
+  trControl = cv,
+  tuneGrid = hyper_grid,
+  metric = "RMSE"
+)
+
+knn_fit
+```
+
+```{r}
+ggplot(knn_fit)
+```
