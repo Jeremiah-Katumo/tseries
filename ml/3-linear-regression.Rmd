@@ -1,0 +1,43 @@
+---
+title: "3-linear-regression"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(caret)
+library(TSstudio)
+library(h2o)
+library(naniar)
+library(vip)
+library(recipes)
+library(visdat)
+```
+
+```{r}
+h2o.no_progress()
+h2o.init(max_mem_size = "4G")
+```
+
+```{r}
+ames <- AmesHousing::make_ames()
+
+set.seed(40)  # for reproducibility
+split  <- rsample::initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- rsample::training(split)
+ames_test   <- rsample::testing(split)
+```
+
+```{r}
+lm1 <- lm(Sale_Price ~ Gr_Liv_Area, data = ames_train)
+summary(lm1)
+```
+
+```{r}
+sigma(lm1)  # RMSE
+sigma(lm1) ^ 2  # MSE
+```
+
+```{r}
+confint(lm1, level = .95)
+```

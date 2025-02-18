@@ -1,0 +1,87 @@
+```{r}
+library(tidyverse)
+library(naniar)
+library(visdat)
+library(caret)
+library(recipes)
+library(h2o)
+library(TSstudio)
+```
+
+```{r}
+h2o.no_progress()
+h2o.init(max_mem_size = "4G")
+```
+
+## Transformation
+
+```{r}
+ames <- AmesHousing::make_ames()
+
+set.seed(40)  # for reproducibility
+split  <- rsample::initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- rsample::training(split)
+ames_test   <- rsample::testing(split)
+```
+
+```{r}
+head(ames)
+```
+
+```{r}
+transformed_response <- log(ames_train$Sale_Price)
+```
+
+```{r}
+ames_recipe <- ames_train %>% recipe(Sale_Price ~ .) %>%
+  step_log(all_outcomes())
+
+ames_recipe
+```
+
+```{r}
+blueprint <- recipe(Sale_Price ~ ., data = ames_train) %>%
+  step_nzv(all_nominal()) %>%   # filter near zero variance features for categorical features
+  step_integer(matches("Qual|Cond|QC|Qu")) %>%     # Ordinally encode all quality features, which are on a 1–10 Likert scale.
+  step_center(all_numeric(), -all_outcomes()) %>%  # Standardize (center and scale) all numeric features.
+  step_scale(all_numeric(), -all_outcomes()) %>%   # Standardize (center and scale) all numeric features.
+  step_pca(all_numeric(), -all_outcomes()) %>%     # Perform dimension reduction by applying PCA to all numeric features.
+  step_dummy(all_nominal(), -all_outcomes(), one_hot = TRUE)   # One-hot encode our remaining categorical features.
+
+blueprint
+```
+
+```{r}
+baked_train <- blueprint %>%
+  prep(training = ames_train) %>%
+  bake(new_data = ames_train)
+
+baked_test <- blueprint %>%
+  prep(training = ames_train) %>%
+  bake(new_data = ames_test)
+
+baked_train
+```
+
+```{r}
+cv <- trainControl(
+  method = "repeatedcv", number = 10, repeats = 5
+)
+
+hyper_grid <- expand.grid(k = seq(2, 25, by = 1))
+
+knn_fit2 <- train(
+  blueprint,
+  data = ames_train,
+  method = "knn",
+  trControl = cv,
+  tuneGrid = hyper_grid,
+  metric = "RMSE"
+)
+
+knn_fit2
+```
+
+```{r}
+ggplot(knn_fit2)
+```
