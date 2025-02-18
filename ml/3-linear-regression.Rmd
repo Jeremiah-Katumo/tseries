@@ -88,9 +88,13 @@ cv_model3 <- train(
 summary(resamples(list(
   model1 = cv_model1,
   model2 = cv_model2,
-  model3 = cv_mode       l3
+  model3 = cv_model3
 )))
 ```
+
+## Model Concerns
+
+**Linear relationship**
 
 ```{r}
 p1 <- ggplot(ames_train, aes(Year_Built, Sale_Price)) +
@@ -109,4 +113,69 @@ p2 <- ggplot(ames_train, aes(Year_Built, Sale_Price)) +
   ggtitle(paste("Transforming variables can provide a\n", "near-linear relationship."))
 
 gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+
+**Constant variance among residuals**
+
+```{r}
+df1 <- broom::augment(cv_model1$finalModel, data = ames_train)
+
+p1 <- ggplot(df1, aes(.fitted, .std.resid)) +
+  geom_point(size = 1, alpha = .4) +
+  xlab("Predicted values") +
+  ylab("Residuals") +
+  ggtitle("Model 1", subtitle = "Sale_Price ~ Gr_Liv_Area")
+
+df2 <- broom::augment(cv_model3$finalModel, data = ames_train)
+
+p2 <- ggplot(df2, aes(.fitted, .std.resid)) +
+  geom_point(size = 1, alpha = .4) +
+  xlab("Predicted values") +
+  ylab("Residuals") +
+  ggtitle("Model 3", subtitle = "Sale_Price ~ .")
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+
+#### No Autocorrelation
+
+```{r}
+df1 <- mutate(df1, id = row_number())
+df2 <- mutate(df2, id = row_number())
+
+p1 <- ggplot(df1, aes(id, .std.resid)) +
+  geom_point(size = 1, alpha = .4) +
+  xlab("Row ID") +
+  ylab("Residuals") +
+  ggtitle("Model 1", subtitle = "Correlated residuals.")
+
+p2 <- ggplot(df2, aes(id, .std.resid)) +
+  geom_point(size = 1, alpha = .4) +
+  xlab("Row ID") +
+  ylab("Residuals") +
+  ggtitle("Model 3", subtitle = "Uncorrelated residuals.")
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+
+#### No Multicollinearity
+
+```{r}
+# fit with two strongly correlated variables
+summary(cv_model3) %>%
+  broom::tidy() %>%
+  filter(term %in% c("Garage_Area", "Garage_Cars"))
+```
+
+```{r}
+mod_wo_Garage_Cars <- train(
+  Sale_Price ~ .,
+  data = select(ames_train, -Garage_Cars),
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+summary(mod_wo_Garage_Cars) %>%
+  broom::tidy() %>%
+  filter(term == "Garage_Area")
 ```
