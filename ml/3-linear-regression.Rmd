@@ -181,3 +181,22 @@ summary(mod_wo_Garage_Cars) %>%
 ```
 
 ## Principal Component Regression
+
+```{r}
+cv_model_pcr <- train(
+  Sale_Price ~ .,
+  data = ames_train,
+  method = "pcr",
+  trControl = trainControl(method = "cv", number = 10),
+  preProcess = c("zv", "center", "scale"),
+  tuneLength = 20
+)
+```
+
+```{r}
+cv_model_pcr$bestTune
+```
+
+```{r}
+ggplot(cv_model_pcr)
+```
