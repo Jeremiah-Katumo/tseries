@@ -200,3 +200,24 @@ cv_model_pcr$bestTune
 ```{r}
 ggplot(cv_model_pcr)
 ```
+
+## Partial Least Squares
+
+```{r}
+cv_model_pls <- train(
+  Sale_Price ~ .,
+  data = ames_train,
+  method = "pls",
+  trControl = trainControl(method = "cv", number = 10),
+  preProcess = c("zv", "center", "scale"),
+  tuneLength = 20
+)
+```
+
+```{r}
+cv_model_pls$bestTune
+```
+
+```{r}
+ggplot(cv_model_pls)
+```
