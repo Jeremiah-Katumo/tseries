@@ -1,0 +1,29 @@
+---
+title: "1-modelling-processes"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(rsample)
+library(caret)
+library(h2o)
+
+h2o.no_progress()
+h2o.init()
+```
+
+```{r}
+ames <- AmesHousing::make_ames()
+head(ames)
+```
+
+```{r}
+ames.h2o <- as.h2o(ames)
+head(ames.h2o)
+```
+
+```{r}
+
+```

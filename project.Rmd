@@ -994,3 +994,179 @@ plot_forecast(ses_fc) %>%
          xaxis = list(range = c(2000, 2022)),
          yaxis = list(title = "Percentage Unemployment Rate (%)"))
 ```
+
+```{r}
+# Holt Method
+holt_fc <- holt(unrate_train, h = 12, initial = "optimal")
+holt_fc
+```
+
+```{r}
+holt_fc$model
+```
+
+```{r}
+accuracy(holt_fc, unrate_test)
+```
+
+```{r}
+test_forecast(unrate_ts, forecast.obj = holt_fc, test = unrate_test,
+              Ygrid = "TRUE", Xgrid = "TRUE")
+```
+
+```{r}
+holt_exp_fc <- holt(unrate_train, h = 12, beta = 0.75, initial = "optimal", exponential = TRUE)
+
+holt_exp_fc$model
+```
+
+```{r}
+accuracy(holt_exp_fc, unrate_test)
+```
+
+```{r}
+test_forecast(unrate_ts, forecast.obj = holt_exp_fc, test = unrate_test,
+              Ygrid = TRUE, Xgrid = TRUE)
+```
+
+```{r}
+# Holt Winters Model
+holt_winters_model <- HoltWinters(unrate_train)
+holt_winters_model
+```
+
+```{r}
+holt_winters_fc <- forecast(holt_winters_model, h = 12)
+
+accuracy(holt_winters_fc, unrate_test)
+```
+
+```{r}
+test_forecast(actual = unrate_ts, forecast.obj = holt_winters_fc, test = unrate_test,
+              hover = TRUE,
+              Ygrid = TRUE, Xgrid = TRUE)
+```
+
+```{r}
+shallow_grid <- ts_grid(unrate_train,
+                        model = "HoltWinters",
+                        periods = 6,
+                        window_space = 6,
+                        window_test = 12,
+                        hyper_params = list(alpha = seq(0,1,0.1),
+                                            beta = seq(0,1,0.1),
+                                            gamma = seq(0, 1, 0.1)),
+                        parallel = TRUE,
+                        n.cores = 8)
+```
+
+```{r}
+shallow_grid$grid_df
+```
+
+```{r}
+plot_grid(shallow_grid)
+```
+
+```{r}
+# deep_grid <- ts_grid(unrate_train,
+#                       model = "HoltWinters",
+#                       periods = 6,
+#                       window_space = 6,
+#                       window_test = 12,
+#                       hyper_params = list(alpha = seq(0.1,0.5,0.01),
+#                                           beta = seq(0,0.1,0.01),
+#                                           gamma = seq(0.2,0.4,0.01)),
+#                       parallel = TRUE,
+#                       n.cores = 8)
+```
+
+```{r}
+holt_winters_grid_model <- HoltWinters(unrate_train,
+                                       alpha = shallow_grid$alpha,
+                                       beta = shallow_grid$beta,
+                                       gamma = shallow_grid$gamma)
+
+holt_winters_grid_fc <- forecast(holt_winters_grid_model, h = 12)
+
+accuracy(holt_winters_grid_fc, unrate_test)
+```
+
+```{r}
+test_forecast(actual = unrate_ts, forecast.obj = holt_winters_fc, test = unrate_test,
+              Ygrid = TRUE, Xgrid = TRUE)
+```
+
+```{r}
+ts_plot(diff(diff(unrate_ts, lag = 1)),
+        title = "Unemployment Rate in the US",
+        Xtitle = "Year",
+        Ytitle = "Rate in Percent (%)")
+```
+
+```{r}
+ts_plot(diff(diff(unrate_ts, lag = 1), 12),
+        title = "Unemployment Rate in the US",
+        Xtitle = "Year",
+        Ytitle = "Rate in Percent (%)")
+```
+
+```{r}
+ts_plot(diff(log(unrate_ts), lag = 1),
+        title = "Unemployment Rate in the US",
+        Xtitle = "Year",
+        Ytitle = "Rate in Percent (%)")
+```
+
+```{r}
+ts_cor(unrate_ts, type = "both")
+```
+
+```{r}
+ts_cor(diff(unrate_ts), type = "both")
+```
+
+```{r}
+arima_model <- arima(unrate_ts, order = c(1,1,0))
+
+summary(arima_model)
+```
+
+```{r}
+checkresiduals(arima_model)
+```
+
+```{r}
+ts_reshape(unrate_ts, frequency = "MS")
+```
+
+```{r}
+auto_arima <- auto.arima(unrate_test)
+
+auto_arima
+```
+
+```{r}
+auto_arima2 <- auto.arima(unrate_train, 
+                          max.order = 5,
+                          D = 1,
+                          d = 1,
+                          stepwise = FALSE,
+                          approximation = FALSE)
+
+auto_arima2
+```
+
+```{r}
+checkresiduals(auto_arima2)
+```
+
+```{r}
+best_arima <- arima(unrate_train, order = c(0,1,0))
+
+best_arima
+```
+
+```{r}
+checkresiduals(best_arima)
+```

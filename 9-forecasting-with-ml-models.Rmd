@@ -169,8 +169,8 @@ mape_lr
 # h2o.ls()  # List objects in H2O cluster
 # h2o.removeAll()  # Free up memory before rerunning
 
-h2o.shutdown(prompt = FALSE)  # Shutdown existing H2O instance
-Sys.sleep(5)  # Wait a few seconds
+# h2o.shutdown(prompt = FALSE)  # Shutdown existing H2O instance
+# Sys.sleep(5)  # Wait a few seconds
 h2o.init(max_mem_size = "4G")  # Start H2O with 4GB RAM
 ```
 

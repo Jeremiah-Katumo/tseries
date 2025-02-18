@@ -507,7 +507,7 @@ names(df) <- c("date", "y")
 ```{r}
 df$lag12 <- dplyr::lag(df$y, n = 12)
 
-df$month <- factor(month(df$date, label = TRUE), ordered = FALSE)
+df$month <- factor(lubridate::month(df$date, label = TRUE), ordered = FALSE)
 
 df$trend <- 1:nrow(df)
 ```
