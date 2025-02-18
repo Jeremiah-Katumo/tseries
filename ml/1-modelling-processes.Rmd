@@ -71,3 +71,44 @@ split_3 <- ts_split(USVSales, sample.out = 12)
 train_5 <- split_3$train
 test_5 <- split_3$test
 ```
+
+### 2. Stratified Sampling
+
+```{r}
+table(churn$Attrition) %>% prop.table()
+```
+
+```{r}
+split_strat <- initial_split(churn, prop = 0.7, strata = "Attrition")
+
+train_strat <- training(split_strat)
+test_strat <- testing(split_strat)
+
+table(train_strat$Attrition) %>% prop.table()
+```
+
+```{r}
+table(test_strat$Attrition) %>% prop.table()
+```
+
+### Resampling Methods
+
+#### 1. k-fold cross validation
+
+```{r}
+x = c("Year_Sold", "Longitude", "Latitude")
+y = c("Sale_Price")
+```
+
+```{r}
+h2o.cv <- h2o.glm(
+  x = x,
+  y = y,
+  training_frame = ames.h2o,
+  nfolds = 10
+)
+```
+
+```{r}
+vfold_cv(ames, v = 10)
+```
