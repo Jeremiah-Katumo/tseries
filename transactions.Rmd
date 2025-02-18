@@ -1,0 +1,93 @@
+---
+title: "transactions"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(tidyr)
+library(h2o)
+library(TSstudio)
+library(plotly)
+library(zoo)
+library(xts)
+library(Quandl)
+library(forecast)
+library(readr)
+library(readxl)
+library(naniar)
+library(corrplot)
+library(timetk)
+library(tseries)
+library(lmtest)
+library(dtw)
+library(reshape2)
+library(gganimate)
+library(WaveletComp)
+library(tuneR)
+library(seewave)
+```
+
+```{r}
+transactions <- read_excel("~/Documents/Transactions.xlsx")
+head(transactions)
+```
+
+```{r}
+transaction <- transactions[c("Transaction Date", "Amount")]
+
+head(transaction)
+```
+
+```{r}
+transaction$`Transaction Date` <- as.Date(transaction$`Transaction Date`)
+
+head(transaction)
+```
+
+```{r}
+vis_miss(transaction)
+```
+
+```{r}
+str(transaction)
+```
+
+```{r}
+transaction_ts <- tk_ts(transaction, start = c(lubridate::year(min(transaction$`Transaction Date`)),
+                                  lubridate::month(min(transaction$`Transaction Date`))), frequency = 365)
+```
+
+```{r}
+ts_plot(transaction)
+```
+
+```{r}
+ts_info(transaction_ts)
+```
+
+```{r}
+ts_decompose(transaction_ts)
+```
+
+```{r}
+transaction_detrend = transaction_ts - decompose(transaction_ts)$trend
+
+ts_seasonal(transaction_detrend, type = "box")
+```
+
+```{r}
+ts_seasonal(transaction_detrend)
+```
+
+```{r}
+ts_cor(transaction_ts, type = "both")
+```
+
+```{r}
+ts_lags(transaction_ts, lags = c(12, 24, 36))
+```
+
+```{r}
+ts_heatmap(transaction_ts)
+```
