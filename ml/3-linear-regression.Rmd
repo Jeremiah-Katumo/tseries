@@ -179,3 +179,5 @@ summary(mod_wo_Garage_Cars) %>%
   broom::tidy() %>%
   filter(term == "Garage_Area")
 ```
+
+## Principal Component Regression
