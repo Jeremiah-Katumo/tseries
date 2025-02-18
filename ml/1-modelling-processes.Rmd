@@ -4,11 +4,13 @@ output: html_document
 ---
 
 ```{r}
-library(dplyr)
-library(ggplot2)
+library(tidyverse)
 library(rsample)
 library(caret)
 library(h2o)
+library(readxl)
+library(TSstudio)
+library(plotly)
 
 h2o.no_progress()
 h2o.init()
@@ -25,5 +27,47 @@ head(ames.h2o)
 ```
 
 ```{r}
+attrition <- read_csv("/home/jeremy/Work/Data Science/Code in Zip/homlr-master/data/attrition.csv")
+head(attrition)
+```
 
+```{r}
+churn <- attrition %>%
+  mutate_if(is.ordered, .funs = factor, ordered = FALSE)
+
+churn.h2o <- as.h2o(churn)
+head(churn.h2o)
+```
+
+### Data Splitting
+
+#### 1. Simple Random Sampling
+
+```{r}
+set.seed(40)
+
+# Using base R
+index_1 <- sample(1:nrow(ames), round(nrow(ames) * 0.7))
+train_1 <- ames[index_1, ]
+test_1 <- ames[-index_1, ]
+
+# Using caret
+index_2 <- createDataPartition(ames$Sale_Price, p = 0.7, list = FALSE)
+train_2 <- ames[index_2, ]
+test_2 <- ames[-index_2, ]
+
+# Using rsample
+split_1 <- initial_split(ames, prop = 0.7)
+train_3 <- training(split_1)
+test_3 <- testing(split_1)
+
+# Using h2o
+split_2 <- h2o.splitFrame(ames.h2o, ratios = 0.7, seed = 40)
+train_4 <- split_2[[1]]
+test_4 <- split_2[[2]]
+
+#Using TSstudio for time series
+split_3 <- ts_split(USVSales, sample.out = 12)
+train_5 <- split_3$train
+test_5 <- split_3$test
 ```
