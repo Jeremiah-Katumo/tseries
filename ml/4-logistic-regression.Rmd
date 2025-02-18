@@ -1,0 +1,30 @@
+---
+title: "4-logistic-regression"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(caret)
+library(h2o)
+library(vip)
+library(pdp)
+library(plotly)
+library(TSstudio)
+library(rsample)
+```
+
+```{r}
+attrition <- read_csv("/home/jeremy/Work/Data Science/Code in Zip/homlr-master/data/attrition.csv")
+head(attrition)
+```
+
+```{r}
+df <- attrition %>% mutate_if(is.ordered, factor, ordered = FALSE)
+
+set.seed(40) # for reproducibility
+
+churn_split <- initial_split(df, prop = .7, strata = "Attrition")
+churn_train <- training(churn_split)
+churn_test <- testing(churn_split)
+```
