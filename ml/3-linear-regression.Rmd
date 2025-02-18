@@ -41,3 +41,72 @@ sigma(lm1) ^ 2  # MSE
 ```{r}
 confint(lm1, level = .95)
 ```
+
+```{r}
+(lm2 <- lm(Sale_Price ~ Gr_Liv_Area + Year_Built, data = ames_train))
+```
+
+```{r}
+(l2 <- update(lm1, . ~ . + Year_Built))
+```
+
+```{r}
+lm3 <- lm(Sale_Price ~ ., data = ames_train)
+
+broom::tidy(lm3)
+```
+
+```{r}
+(cv_model1 <- train(
+  form = Sale_Price ~ Gr_Liv_Area,
+  data = ames_train,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+))
+```
+
+```{r}
+(cv_model2 <- train(
+  Sale_Price ~ Gr_Liv_Area + Year_Built,
+  data = ames_train,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+))
+```
+
+```{r}
+cv_model3 <- train(
+  Sale_Price ~ .,
+  data = ames_train,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+)
+```
+
+```{r}
+# Extract out of sample performance measures
+summary(resamples(list(
+  model1 = cv_model1,
+  model2 = cv_model2,
+  model3 = cv_mode       l3
+)))
+```
+
+```{r}
+p1 <- ggplot(ames_train, aes(Year_Built, Sale_Price)) +
+  geom_point(size = 1, alpha = .4) +
+  geom_smooth(se = FALSE) +
+  scale_y_continuous("Sale price", labels = scales::dollar) +
+  xlab("Year built") +
+  ggtitle(paste("Non-transformed variables with a\n", "non-linear relationship."))
+
+p2 <- ggplot(ames_train, aes(Year_Built, Sale_Price)) +
+  geom_point(size = 1, alpha = .4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_y_log10("Sale price", labels = scales::dollar,
+  breaks = seq(0, 400000, by = 100000)) +
+  xlab("Year built") +
+  ggtitle(paste("Transforming variables can provide a\n", "near-linear relationship."))
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
