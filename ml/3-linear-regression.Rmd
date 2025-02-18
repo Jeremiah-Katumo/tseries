@@ -221,3 +221,17 @@ cv_model_pls$bestTune
 ```{r}
 ggplot(cv_model_pls)
 ```
+
+## Feature Interpretation
+
+```{r}
+vip(cv_model_pls, num_features = 20, method = "model")
+```
+
+```{r}
+pdp::partial(cv_model_pls, "Gr_Liv_Area", grid.resolution = 20, plot = TRUE)
+```
+
+```{r}
+pdp::partial(cv_model_pls, "Garage_Cars", grid.resolution = 20, plot = TRUE)
+```
