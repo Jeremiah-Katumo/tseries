@@ -395,5 +395,93 @@ pdp::partial(cv_glmnet, pred.var = "Gr_Liv_Area", grid.resolution = 20)
 ```
 
 ```{r}
+plot_1 <- pdp::partial(cv_glmnet, pred.var = "Gr_Liv_Area", grid.resolution = 20) %>%
+  mutate(yhat = exp(yhat)) %>%
+  ggplot(aes(Gr_Liv_Area, yhat)) +
+  geom_line() +
+  scale_y_continuous(limits = c(0, 300000), labels = scales::dollar)
+```
 
+```{r}
+plot_2 <- pdp::partial(cv_glmnet, pred.var = "Overall_QualExcellent", grid.resolution = 20) %>%
+  mutate(yhat = exp(yhat),
+         Overall_QualExcellent = factor(Overall_QualExcellent)
+  ) %>%
+  ggplot(aes(Overall_QualExcellent, yhat)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, 300000), labels = scales::dollar)
+```
+
+```{r}
+plot_3 <- pdp::partial(cv_glmnet, pred.var = "First_Flr_SF", grid.resolution = 20) %>%
+  mutate(yhat = exp(yhat)) %>%
+  ggplot(aes(First_Flr_SF, yhat)) +
+  geom_line() +
+  scale_y_continuous(limits = c(0, 300000), labels = scales::dollar)
+```
+
+```{r}
+plot_4 <- pdp::partial(cv_glmnet, pred.var = "Garage_Cars") %>%
+  mutate(yhat = exp(yhat)) %>%
+  ggplot(aes(Garage_Cars, yhat)) +
+  geom_line() +
+  scale_y_continuous(limits = c(0, 300000), labels = scales::dollar)
+```
+
+```{r}
+gridExtra::grid.arrange(plot_1, plot_2, plot_3, plot_4, nrow = 2)
+```
+
+```{r}
+pdp::partial(cv_glmnet, pred.var = "Overall_QualPoor") %>%
+  mutate(
+    yhat = exp(yhat),
+    Overall_QualPoor = factor(Overall_QualPoor)
+    ) %>%
+  ggplot(aes(Overall_QualPoor, yhat)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, 300000), labels = scales::dollar)
+```
+
+```{r}
+library(readr)
+attrition <- read_csv("/home/jeremy/Work/Data Science/Code in Zip/homlr-master/data/attrition.csv")
+
+df <- attrition %>% mutate_if(is.ordered, factor, ordered = FALSE)
+
+# Create training (70%) and test (30%) sets for the
+# rsample::attrition data. Use set.seed for reproducibility
+churn_split <- initial_split(df, prop = .7, strata = "Attrition")
+train <- training(churn_split)
+test <- testing(churn_split)
+
+# train logistic regression model
+glm_mod <- train(
+  Attrition ~ .,
+  data = train,
+  method = "glm",
+  family = "binomial",
+  preProc = c("zv", "center", "scale"),
+  trControl = trainControl(method = "cv", number = 10)
+)
+  
+# train regularized logistic regression model
+penalized_mod <- train(
+  Attrition ~ .,
+  data = train,
+  method = "glmnet",
+  family = "binomial",
+  preProc = c("zv", "center", "scale"),
+  trControl = trainControl(method = "cv", number = 10),
+  tuneLength = 10
+)
+```
+
+```{r}
+summary(resamples(
+  list(
+    logistic_model = glm_mod,
+    penalized_model = penalized_mod
+  )
+))$statistics$Accuracy
 ```
