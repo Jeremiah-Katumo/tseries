@@ -1,0 +1,156 @@
+---
+title: "regularized-regression"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(caret)
+library(h2o)
+library(glmnet)
+library(naniar)
+library(vip)
+library(TSstudio)
+library(plotly)
+library(ROCR)
+library(recipes)
+library(rsample)
+library(timetk)
+pacman::p_load(epirhandbook)
+```
+
+```{r}
+ames <- AmesHousing::make_ames()
+
+ames$Date <- as.Date(paste(ames$Year_Sold, ames$Mo_Sold, "01", sep = "-"))
+
+set.seed(40)  # for reproducibility
+split  <- rsample::initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- rsample::training(split)
+ames_test   <- rsample::testing(split)
+```
+
+```{r}
+names(ames)
+```
+
+```{r}
+ames_sub <- ames_train %>%
+  filter(Gr_Liv_Area > 1000 & Gr_Liv_Area < 3000) %>%
+  sample_frac(.5)
+
+model1 <- lm(Sale_Price ~ Gr_Liv_Area, data = ames_sub)
+```
+
+```{r}
+model1 %>%
+  broom::augment() %>%
+  ggplot(aes(Gr_Liv_Area, Sale_Price)) +
+  geom_segment(aes(x = Gr_Liv_Area, y = Sale_Price, 
+                   xend = Gr_Liv_Area, yend = .fitted),
+               alpha = .3) +
+  geom_point(size = 1, color = "red") +
+  geom_smooth(se = FALSE, method = "lm") +
+  scale_y_continuous(labels = scales::dollar)
+```
+
+```{r}
+# Augment model data
+augmented_data <- model1 %>% broom::augment()
+
+# Create interactive plot with plotly
+plot_ly(augmented_data) %>%
+  add_segments(
+    x = ~Gr_Liv_Area, y = ~Sale_Price,
+    xend = ~Gr_Liv_Area, yend = ~.fitted,
+    opacity = 0.3, line = list(color = "gray")
+  ) %>%
+  add_markers(
+    x = ~Gr_Liv_Area, y = ~Sale_Price,
+    marker = list(color = "red", size = 5)
+  ) %>%
+  add_lines(
+    x = ~Gr_Liv_Area, y = ~.fitted,
+    line = list(color = "blue", width = 2),
+    name = "Fitted Line"
+  ) %>%
+  layout(
+    title = "Living Area vs Sale Price",
+    xaxis = list(title = "Above Ground Living Area (sq ft)"),
+    yaxis = list(title = "Sale Price", tickformat = "$,.0f")
+  )
+```
+
+```{r}
+# Create a Date column with the first day of each month
+# ames_train$Date <- as.Date(paste(ames_train$Year_Sold, ames_train$Mo_Sold, "01", sep = "-"))
+# ames_test$Date <- as.Date(paste(ames_test$Year_Sold, ames_test$Mo_Sold, "01", sep = "-"))
+
+# ames_train$Date <- as.Date(as.character(ames_train$Date), format = "%Y%m%d")
+# ames_test$Date <- as.Date(as.character(ames_test$Date), format = "%Y%m%d")
+
+ames_time_train <- ames_train %>% select(Date, Sale_Price)
+ames_time_test <- ames_test %>% select(Date, Sale_Price)
+
+# Convert to time series object
+price_ts <- tk_ts(ames_time_train$Sale_Price, 
+                   start = c(lubridate::year(min(ames$Date)), 
+                             lubridate::month(min(ames$Date))), 
+                   frequency = 12)
+
+ts_plot(price_ts, line.mode = "lines", width = 2,
+        Xtitle = "Year",
+        Ytitle = "Sale Prices",
+        title = "Monthly Sale Prices",
+        Ygrid = TRUE,
+        Xgrid = TRUE)
+```
+
+```{r}
+df <- model1 %>% broom::augment()
+
+plot_ly(data = df, x = df$Gr_Liv_Area, y = df$Sale_Price,
+        yaxis = "Sale Price", xaxis = "Gr Living Area")
+```
+
+### Ridge Regression
+
+-   However, ridge regression does not perform feature selection and will retain all available features in the ﬁnal model. Therefore, a ridge model is good if you believe there is a need to retain all features in your model yet reduce the noise that less inﬂuential variables may create (e.g., in smaller data sets with severe multicollinearity). If greater interpretation is necessary and many of the features are redundant or irrelevant then a lasso or elastic net penalty may be preferable.
+
+```{r}
+boston_train_x <- model.matrix(cmedv ~ ., pdp::boston)[, -1]
+boston_train_y <- pdp::boston$cmedv
+
+head(boston_train_x)
+```
+
+```{r}
+boston_ridge_model <- glmnet::glmnet(
+  x = boston_train_x,
+  y = boston_train_y,
+  alpha = 0
+)
+
+summary(boston_ridge_model)
+```
+
+```{r}
+boston_ridge_model$lambda %>% head()
+```
+
+```{r}
+boston_ridge_model$a0 %>% names()
+```
+
+```{r}
+lamb_da <- boston_ridge_model$lambda %>%
+  as.data.frame() %>%
+  mutate(penalty = boston_ridge_model$a0 %>% names()) %>%
+  rename(lambda = ".")
+
+head(lamb_da)
+```
+
+```{r}
+
+```
