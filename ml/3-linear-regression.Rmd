@@ -33,6 +33,14 @@ lm1 <- lm(Sale_Price ~ Gr_Liv_Area, data = ames_train)
 summary(lm1)
 ```
 
+-   Most statistical software, including R, will include estimated standard errors, t-statistics, etc. as part of its regression output. However, it is important to remember that such quantities depend on three major assumptions of the linear regresion model:
+
+    1.  Independent observations
+
+    2.  The random errors have mean zero, and constant variance
+
+    3.  The random errors are normally distributed
+
 ```{r}
 sigma(lm1)  # RMSE
 sigma(lm1) ^ 2  # MSE
@@ -51,6 +59,10 @@ confint(lm1, level = .95)
 ```
 
 ```{r}
+summary(l2)
+```
+
+```{r}
 lm3 <- lm(Sale_Price ~ ., data = ames_train)
 
 broom::tidy(lm3)
@@ -64,6 +76,10 @@ broom::tidy(lm3)
   trControl = trainControl(method = "cv", number = 10)
 ))
 ```
+
+-   The resulting cross-validated RMSE is \$56,220.6 (this is the average RMSE across the 10 CV folds). How should we interpret this? When applied to unseen data, the predictions this model makes are, on average, about \$56,220.6 oﬀ from the actual sale price.
+
+-   We can perform cross-validation on the other two models in a similar fashion, which we do in the code chunk below.
 
 ```{r}
 (cv_model2 <- train(
@@ -92,9 +108,13 @@ summary(resamples(list(
 )))
 ```
 
+-   Extracting the results for each model, we see that by adding more information via more predictors, we are able to improve the out-of-sample cross validation performance metrics. Speciﬁcally, our cross-validated RMSE reduces from \$46,132.74 (the model with two predictors) down to \$37,304.33 (for our full model). In this case, the model with all possible main eﬀects performs the “best” (compared with the other two).
+
 ## Model Concerns
 
 **Linear relationship**
+
+-   Linear regression assumes a linear relationship be- tween the predictor and the response variable. However, as discussed in Chapter 3, non-linear relationships can be made linear (or near-linear) by applying transformations to the response and/or predictors.
 
 ```{r}
 p1 <- ggplot(ames_train, aes(Year_Built, Sale_Price)) +
@@ -115,7 +135,9 @@ p2 <- ggplot(ames_train, aes(Year_Built, Sale_Price)) +
 gridExtra::grid.arrange(p1, p2, nrow = 1)
 ```
 
-**Constant variance among residuals**
+**Constant variance among residuals (Homoscedasticity)**
+
+-   Linear regression assumes the variance among error terms (𝜖1 , 𝜖2 , … , 𝜖u� ) are constant (this assumption is referred to as homoscedasticity). If the error variance is not constant, the p-values and conﬁdence intervals for the coeﬃcients will be invalid. Similar to the linear relationship assumption, non-constant variance can often be resolved with variable transformations or by including additional predictors.
 
 ```{r}
 df1 <- broom::augment(cv_model1$finalModel, data = ames_train)
@@ -139,6 +161,8 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 
 #### No Autocorrelation
 
+-   Linear regression assumes the errors are independent and uncorrelated. If in fact, there is correlation among the errors, then the estimated standard errors of the coeﬃcients will be biased leading to prediction intervals being narrower than they should be.
+
 ```{r}
 df1 <- mutate(df1, id = row_number())
 df2 <- mutate(df2, id = row_number())
@@ -158,7 +182,16 @@ p2 <- ggplot(df2, aes(id, .std.resid)) +
 gridExtra::grid.arrange(p1, p2, nrow = 1)
 ```
 
-#### No Multicollinearity
+#### No or little Multicollinearity
+
+-   Collinearity refers to the situation in which two or more predictor variables are closely related to one another. The presence of collinearity can pose problems in the OLS, since it can be diﬃcult to separate out the individual eﬀects of collinear variables on the response. In fact, collinearity can cause predictor variables to appear as statistically insigniﬁcant when in fact they are signiﬁcant. This obviously leads to an inaccurate interpretation of coeﬃcients and makes it diﬃcult to identify inﬂuential predictors.
+
+-   In ames, for example, Garage_Area and Garage_Cars are two variables that have a correlation of 0.89 and both variables are strongly related to our response variable (Sale_Price). Looking at our full model where both of these variables are included, we see that Garage_Cars is found to be statistically signiﬁcant but Garage_Area is not:
+
+```{r}
+cor(ames[-1, ])
+
+```
 
 ```{r}
 # fit with two strongly correlated variables
@@ -166,6 +199,8 @@ summary(cv_model3) %>%
   broom::tidy() %>%
   filter(term %in% c("Garage_Area", "Garage_Cars"))
 ```
+
+-   However, if we reﬁt the full model without Garage_Cars, the coeﬃcient estimate for Garage_Area increases two fold and becomes statistically signiﬁcant.
 
 ```{r}
 mod_wo_Garage_Cars <- train(

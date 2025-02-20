@@ -12,6 +12,7 @@ library(pdp)
 library(plotly)
 library(TSstudio)
 library(rsample)
+library(ROCR)
 ```
 
 ```{r}
@@ -20,7 +21,8 @@ head(attrition)
 ```
 
 ```{r}
-df <- attrition %>% mutate_if(is.ordered, factor, ordered = FALSE)
+df <- attrition %>% 
+  mutate_if(is.ordered, factor, ordered = FALSE)
 
 set.seed(40) # for reproducibility
 
@@ -32,9 +34,11 @@ churn_test <- testing(churn_split)
 ```{r}
 churn_train <- churn_train %>%
   mutate(Attrition = recode(Attrition, "Yes" = 1, "No" = 0))
+churn_train$Attrition <- as.factor(churn_train$Attrition)
 
 churn_test <- churn_test %>%
-  mutate(Attrition = recode(Attrition, "Yes" = 1, "No" = 0))
+  mutate(Attrition = recode(Attrition, "Yes" = 1, "No" = 0)) 
+churn_test$Attrition <- as.factor(churn_test$Attrition)
 ```
 
 ```{r}
@@ -113,19 +117,24 @@ summary(
 
 ```{r}
 pred_class <- predict(cv_model3, churn_train)
+pred_class <- as.factor(pred_class)
 
 # create confusion matrix
 confusionMatrix(
-  data = relevel(pred_class, ref = "Yes"),
-  reference = relevel(churn_train$Attrition, ref = "Yes")
+  data = relevel(pred_class, ref = 1),
+  reference = relevel(churn_train$Attrition, ref = 1)
 )
 ```
 
 ```{r}
-library(ROCR)
 # Compute predicted probabilities
-m1_prob <- predict(cv_model1, churn_train, type = "prob")$Yes
-m3_prob <- predict(cv_model3, churn_train, type = "prob")$Yes
+m1_prob <- predict(cv_model1, churn_train, type = "prob")
+m3_prob <- predict(cv_model3, churn_train, type = "prob")
+```
+
+```{r}
+m1_prob <- m1_prob$`1`
+m3_prob <- m3_prob$`1`
 
 # Compute AUC metrics for cv_model1 and cv_model3
 perf1 <- prediction(m1_prob, churn_train$Attrition) %>%
@@ -137,8 +146,12 @@ perf2 <- prediction(m3_prob, churn_train$Attrition) %>%
 # Plot ROC curves for cv_model1 and cv_model3
 plot(perf1, col = "black", lty = 2)
 plot(perf2, add = TRUE, col = "blue")
-legend(0.8, 0.2, legend = c("cv_model1", "cv_model3"),
-col = c("black", "blue"), lty = 2:1, cex = 0.6)
+legend(
+  0.8, 0.2, 
+  legend = c("cv_model1", "cv_model3"), 
+  col = c("black", "blue"), 
+  lty = 2:1, cex = 0.6
+)
 ```
 
 ```{r}
