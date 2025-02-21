@@ -1,0 +1,114 @@
+---
+title: "6-decision-tree"
+output: html_document
+---
+
+```{r}
+# Set the graphical theme
+ggplot2::theme_set(ggplot2::theme_light())
+
+# Set global knitr chunk options
+knitr::opts_chunk$set(
+  warning = FALSE, 
+  message = FALSE
+)
+```
+
+```{r}
+library(tidyverse)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(naniar)
+library(pdp)
+library(rsample)
+library(recipes)
+library(vip)
+```
+
+### Partitioning
+
+-   CART uses binary recursive partitioning (it’s recursive because each split or rule depends on the the splits above it). The objective at each node is to ﬁnd the “best” feature (xi� ) to partition the remaining data into one of two regions (𝑅1 and 𝑅2 ) such that the overall error between the actual response (𝑦u� ) and the predicted constant (𝑐u� ) is minimized. For regression problems, the objective function to minimize is the total SSE. For classiﬁcation problems, the partitioning is usually made to maximize the reduction in cross-entropy or the Gini index.
+
+```{r}
+ames <- AmesHousing::make_ames()
+
+ames$Date <- as.Date(paste(ames$Year_Sold, ames$Mo_Sold, "01", sep = "-"))
+
+set.seed(40)  # for reproducibility
+split  <- rsample::initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- rsample::training(split)
+ames_test   <- rsample::testing(split)
+```
+
+```{r}
+ames_dt1 <- rpart(
+  formula = Sale_Price ~ .,
+  data = ames_train,
+  method = "anova"
+)
+
+ames_dt1
+```
+
+```{r}
+rpart.plot(ames_dt1)
+```
+
+```{r}
+plotcp(ames_dt1)
+```
+
+-   Behind the scenes rpart() is automatically applying a range of cost complexity (alpha values to prune the tree). To compare the error of each alpha value, rpart() performs a 10-fold CV (default). In this example, the diminishing returns after 10 terminal nodes.
+
+-   𝑦-axis is the CV error, lower 𝑥-axis is the cost complexity (𝛼) value, upper 𝑥-axis is the number of terminal nodes (i.e., tree size = \|𝑇\|). You may also notice the dashed line which goes through the point \|𝑇\| = 8. It’s common to instead use the smallest tree within 1 standard error (SE) of the minimum CV error (this is called the 1-SE rule). Thus, we could use a tree with 8 terminal nodes and reasonably expect to experience similar results within a small margin of error.
+
+-   To illustrate the point of selecting a tree with 11 terminal nodes (or 8 if you go by the 1-SE rule), we can force rpart() to generate a full tree by setting cp = 0 (no penalty results in a fully grown tree). Figure below shows that after 11 terminal nodes, we see diminishing returns in error reduction as the tree grows deeper. Thus, we can signiﬁcantly prune our tree and still achieve minimal expected error.
+
+```{r}
+ames_dt2 <- rpart(
+  formula = Sale_Price ~ .,
+  data = ames_train,
+  method = "anova",
+  control = list(cp = 0, xval = 10)
+)
+
+plotcp(ames_dt2)
+abline(v = 11, lty = "dashed")
+```
+
+```{r}
+ames_dt2$cptable %>% head()
+```
+
+```{r}
+ames_dt3 <- train(
+  Sale_Price ~ .,
+  data = ames_train,
+  method = "rpart",
+  trControl = trainControl(method = "cv", number = 10),
+  tuneLength = 20
+)
+
+ames_dt3
+```
+
+```{r}
+ggplot(ames_dt3) %>% plotly::ggplotly()
+```
+
+```{r}
+vip(ames_dt3, num_features = 32, geom = "point", aesthetics = list(color = "red")) %>% plotly::ggplotly()
+```
+
+```{r}
+# Construct partial dependence plots
+p1 <- partial(ames_dt3, pred.var = "Gr_Liv_Area") %>% autoplot()
+p2 <- partial(ames_dt3, pred.var = "Year_Built") %>% autoplot()
+p3 <- partial(ames_dt3, pred.var = c("Gr_Liv_Area", "Year_Built")) %>%
+  plotPartial(levelplot = FALSE, zlab = "yhat", drape = TRUE,
+              colorkey = TRUE, screen = list(z = -20, x = -60))
+
+# Display plots side by side
+gridExtra::grid.arrange(p1, p2, p3, ncol = 3)
+```
