@@ -89,13 +89,17 @@ ggplot(cv_mars) %>% plotly::ggplotly()
 
 ```{r}
 # variable importance plots
-p1 <- vip(cv_mars, num_features = 43, bar = FALSE, value = "gcv") +
-  ggtitle("GCV") %>% plotly::ggplotly()
+(
+  p1 <- vip(cv_mars, num_features = 33, bar = FALSE, value = "gcv") %>% 
+    plotly::ggplotly() %>%
+    plotly::layout(title = "GCV")
+)
 
-p2 <- vip(cv_mars, num_features = 43, bar = FALSE, value = "rss") +
-  ggtitle("RSS") %>% plotly::ggplotly()
-
-gridExtra::grid.arrange(p1, p2, ncol = 2)
+(
+  p2 <- vip(cv_mars, num_features = 33, bar = FALSE, value = "rss") %>%
+    plotly::ggplotly() %>%
+    plotly::layout(title = "RSS")
+)
 ```
 
 ```{r}
