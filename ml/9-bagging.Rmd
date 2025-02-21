@@ -1,0 +1,19 @@
+---
+title: "9-random-forest"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(plotly)
+library(doParallel)
+library(foreach)
+library(caret)
+library(rpart)
+library(vip)
+library(pdp)
+```
+
+```{r}
+
+```
