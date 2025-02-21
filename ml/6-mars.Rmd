@@ -31,6 +31,32 @@ ames_test   <- rsample::testing(split)
 ```
 
 ```{r}
+attrition <- read_csv("/home/jeremy/Work/Data Science/Code in Zip/homlr-master/data/attrition.csv")
+head(attrition)
+```
+
+```{r}
+df <- attrition %>% 
+  mutate_if(is.ordered, factor, ordered = FALSE)
+
+set.seed(40) # for reproducibility
+
+churn_split <- initial_split(df, prop = .7, strata = "Attrition")
+churn_train <- training(churn_split)
+churn_test <- testing(churn_split)
+
+churn_train <- churn_train %>%
+  mutate(Attrition = recode(Attrition, "Yes" = 1, "No" = 0))
+churn_train$Attrition <- as.factor(churn_train$Attrition)
+
+churn_test <- churn_test %>%
+  mutate(Attrition = recode(Attrition, "Yes" = 1, "No" = 0)) 
+churn_test$Attrition <- as.factor(churn_test$Attrition)
+```
+
+## Multivariate Adaptive Regression Splines (MARS)
+
+```{r}
 # create a tuning grid
 hyper_grid <- expand.grid(
   degree = 1:3,
@@ -59,4 +85,54 @@ cv_mars$bestTune
 
 ```{r}
 ggplot(cv_mars) %>% plotly::ggplotly()
+```
+
+```{r}
+# variable importance plots
+p1 <- vip(cv_mars, num_features = 43, bar = FALSE, value = "gcv") +
+  ggtitle("GCV") %>% plotly::ggplotly()
+
+p2 <- vip(cv_mars, num_features = 43, bar = FALSE, value = "rss") +
+  ggtitle("RSS") %>% plotly::ggplotly()
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+```{r}
+# extract coefficients, convert to tidy data frame, and
+# filter for interaction terms
+cv_mars$finalModel %>%
+  coef() %>%
+  broom::tidy() %>%
+  filter(stringr::str_detect(names, "\\*"))
+```
+
+```{r}
+# Construct partial dependence plots
+p1 <- partial(cv_mars, pred.var = "Gr_Liv_Area") %>% autoplot() 
+p2 <- partial(cv_mars, pred.var = "Year_Built") %>% autoplot() 
+p3 <- partial(cv_mars, pred.var = c("Gr_Liv_Area", "Year_Built"), chull = TRUE) %>%
+  plotPartial(palette = "inferno", contour = TRUE) %>%
+  ggplotify::as.grob()  # convert to grob to plot with cowplot
+
+# Display plots in a grid
+top_row <- cowplot::plot_grid(p1, p2)
+cowplot::plot_grid(top_row, p3, nrow = 2, rel_heights = c(1, 2))
+```
+
+```{r}
+# cross validated model
+tuned_mars <- train(
+  x = subset(churn_train, select = -Attrition),
+  y = churn_train$Attrition,
+  method = "earth",
+  trControl = trainControl(method = "cv", number = 10),
+  tuneGrid = hyper_grid
+)
+
+# best model
+tuned_mars$bestTune
+
+# plot results
+ggplot(tuned_mars) %>% plotly::ggplotly()
 ```
