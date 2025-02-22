@@ -1,0 +1,50 @@
+---
+title: "10-random-forest"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(caret)
+library(h2o)
+library(ranger)
+library(rsample)
+library(recipes)
+library(vip)
+library(pdp)
+```
+
+```{r}
+set.seed(40) 
+
+ames <- AmesHousing::make_ames()
+
+ames$Date <- as.Date(paste(ames$Year_Sold, ames$Mo_Sold, "01", sep = "-"))
+
+set.seed(40)  # for reproducibility
+split  <- rsample::initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- rsample::training(split)
+ames_test   <- rsample::testing(split)
+```
+
+```{r}
+# number of features
+n_features <- length(setdiff(names(ames_train), "Sale_Price"))
+n_features
+```
+
+```{r}
+ames_rf1 <- ranger(
+  Sale_Price ~ .,
+  data = ames_train,
+  mtry = floor(n_features / 3),
+  respect.unordered.factors = "order"
+)
+
+ames_rf1
+```
+
+```{r}
+# get OOB RMSE
+(default_rmse <- sqrt(ames_rf1$prediction.error))
+```
